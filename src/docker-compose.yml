@@ -94,4 +94,4 @@ services:
     provider:
       type: model
       options:
-        model: ${DOCKER_MODEL}
+        model: ${DOCKER_MODEL:-ai/phi4:14B-Q4_0}
