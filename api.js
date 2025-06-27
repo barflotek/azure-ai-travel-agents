@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import gmailAuthRoutes from './src/api/routes/gmail-auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,7 +53,6 @@ app.get('/test', (req, res) => {
 });
 
 // Gmail Authentication Routes
-import gmailAuthRoutes from './src/api/routes/gmail-auth.js';
 app.use('/api', gmailAuthRoutes);
 
 // Gmail-specific endpoints
@@ -68,7 +68,7 @@ app.post('/api/gmail/check-emails', async (req, res) => {
     }
 
     // Import and use Email Agent with Gmail
-    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
     const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
@@ -103,7 +103,7 @@ app.post('/api/gmail/send-email', async (req, res) => {
     }
 
     // Import and use Email Agent with Gmail
-    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
     const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
@@ -143,7 +143,7 @@ app.post('/api/gmail/search-emails', async (req, res) => {
     }
 
     // Import and use Email Agent with Gmail
-    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
     const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
@@ -420,7 +420,7 @@ app.post('/api/chat', async (req, res) => {
     
     // Set Gmail access if provided
     if (gmailAccessToken) {
-      const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+      const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
       const emailAgent = new EmailAgent(sessionId);
       emailAgent.setGmailAccess(gmailAccessToken);
       conversationalAgent.setEmailAgent(emailAgent);

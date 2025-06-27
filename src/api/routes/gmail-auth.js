@@ -1,5 +1,6 @@
-const express = require('express');
-const { google } = require('googleapis');
+import express from 'express';
+import { google } from 'googleapis';
+
 const router = express.Router();
 
 const oauth2Client = new google.auth.OAuth2(
@@ -138,4 +139,4 @@ router.post('/auth/gmail/revoke', async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 
