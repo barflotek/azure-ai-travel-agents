@@ -2,11 +2,11 @@
   "name": "business-agent-system",
   "version": "1.0.0",
   "description": "Business Agent System with Email, Finance, Social, and Customer Service agents",
-  "main": "src/api/src/basic-api.js",
+  "main": "api.js",
+  "type": "module",
   "scripts": {
-    "start": "cd src/api && npm start",
-    "dev": "cd src/api && npm run dev",
-    "build": "cd src/api && npm run build"
+    "start": "node api.js",
+    "dev": "node api.js"
   },
   "keywords": [
     "ai",
@@ -22,9 +22,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@llamaindex/groq": "^0.0.76",
-    "@llamaindex/ollama": "^0.1.11",
-    "@supabase/supabase-js": "^2.50.2",
-    "dotenv": "^16.6.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2"
   }
 }
