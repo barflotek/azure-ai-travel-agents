@@ -102,9 +102,29 @@ export class MainConversationalAgent {
       }
       
       // Extract description
-      if (lowerMessage.includes('for') || lowerMessage.includes('about')) {
-        const forIndex = Math.max(lowerMessage.indexOf('for'), lowerMessage.indexOf('about'));
-        entities.description = message.substring(forIndex + 4).trim();
+      let descMatch = null;
+      // Try 'on ...'
+      descMatch = message.match(/on ([\w\s\-\&]+)/i);
+      if (descMatch) {
+        entities.description = descMatch[1].replace(/yesterday|today|last week|this week|last month|this month|\d{4}-\d{2}-\d{2}/gi, '').trim();
+      } else {
+        // Try 'for ...'
+        descMatch = message.match(/for ([\w\s\-\&]+)/i);
+        if (descMatch) {
+          entities.description = descMatch[1].replace(/yesterday|today|last week|this week|last month|this month|\d{4}-\d{2}-\d{2}/gi, '').trim();
+        } else {
+          // Try 'about ...'
+          descMatch = message.match(/about ([\w\s\-\&]+)/i);
+          if (descMatch) {
+            entities.description = descMatch[1].replace(/yesterday|today|last week|this week|last month|this month|\d{4}-\d{2}-\d{2}/gi, '').trim();
+          } else {
+            // Try 'worth of ...'
+            descMatch = message.match(/worth of ([\w\s\-\&]+)/i);
+            if (descMatch) {
+              entities.description = descMatch[1].replace(/yesterday|today|last week|this week|last month|this month|\d{4}-\d{2}-\d{2}/gi, '').trim();
+            }
+          }
+        }
       }
     }
     
