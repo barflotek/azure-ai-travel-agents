@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,17 +14,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve the frontend at root
 app.get('/', (req, res) => {
-  res.json({
-    status: 'healthy',
-    service: 'Business Agent System',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check for Railway
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -277,6 +280,93 @@ app.get('/api/status', (req, res) => {
   }
 });
 
+// Chat endpoint for conversational interactions
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, sessionId = 'default-session' } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'message is required'
+      });
+    }
+
+    // Import the Main Conversational Agent
+    const { MainConversationalAgent } = await import('./src/agents/conversational/main-agent.js');
+    const conversationalAgent = new MainConversationalAgent();
+    
+    // Process the message
+    const response = await conversationalAgent.processMessage(sessionId, message);
+    
+    res.json({
+      status: 'success',
+      sessionId,
+      response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Chat API error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get conversation history
+app.get('/api/chat/history/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    const { MainConversationalAgent } = await import('./src/agents/conversational/main-agent.js');
+    const conversationalAgent = new MainConversationalAgent();
+    
+    const history = conversationalAgent.getConversationHistory(sessionId);
+    
+    res.json({
+      status: 'success',
+      sessionId,
+      history,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Chat history error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Clear conversation history
+app.delete('/api/chat/history/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    const { MainConversationalAgent } = await import('./src/agents/conversational/main-agent.js');
+    const conversationalAgent = new MainConversationalAgent();
+    
+    conversationalAgent.clearConversation(sessionId);
+    
+    res.json({
+      status: 'success',
+      message: 'Conversation history cleared',
+      sessionId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Clear chat history error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -290,7 +380,10 @@ app.use('*', (req, res) => {
       'POST /api/email/compose',
       'POST /api/finance/categorize',
       'POST /api/social/create-post',
-      'POST /api/customer/respond'
+      'POST /api/customer/respond',
+      'POST /api/chat',
+      'GET /api/chat/history/:sessionId',
+      'DELETE /api/chat/history/:sessionId'
     ],
     timestamp: new Date().toISOString()
   });

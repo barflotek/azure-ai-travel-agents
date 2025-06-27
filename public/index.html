@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Agent System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-8">
+        <h1 class="text-4xl font-bold text-center mb-8 text-blue-600">
+            🤖 Business Agent System
+        </h1>
+        
+        <!-- Main Chat Interface -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">💬 Main Chat Assistant</h2>
+            <div class="flex flex-col h-96">
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="flex-1 overflow-y-auto p-4 bg-gray-50 rounded mb-4 space-y-4">
+                    <div class="text-center text-gray-500">
+                        Start a conversation with your AI assistant...
+                    </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="flex space-x-2">
+                    <input type="text" id="chatInput" placeholder="Type your message here..." 
+                           class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                    <button onclick="sendChatMessage()" 
+                            class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Send
+                    </button>
+                    <button onclick="clearChat()" 
+                            class="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">System Status</h2>
+            <div id="status" class="text-gray-600">Loading...</div>
+            <button onclick="checkStatus()" class="bg-blue-500 text-white px-4 py-2 rounded mt-4 hover:bg-blue-600">
+                Refresh Status
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Email Agent -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-semibold mb-4 text-green-600">📧 Email Agent</h3>
+                <div class="space-y-4">
+                    <input type="email" id="emailRecipient" placeholder="Recipient email" 
+                           class="w-full p-2 border rounded">
+                    <input type="text" id="emailSubject" placeholder="Email subject" 
+                           class="w-full p-2 border rounded">
+                    <textarea id="emailContent" placeholder="Email content request" 
+                              class="w-full p-2 border rounded h-24"></textarea>
+                    <button onclick="composeEmail()" 
+                            class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">
+                        Compose Email
+                    </button>
+                </div>
+                <div id="emailResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+            </div>
+
+            <!-- Finance Agent -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-semibold mb-4 text-blue-600">💰 Finance Agent</h3>
+                <div class="space-y-4">
+                    <input type="number" id="financeAmount" placeholder="Amount (e.g., 299.99)" 
+                           class="w-full p-2 border rounded">
+                    <input type="text" id="financeDescription" placeholder="Expense description" 
+                           class="w-full p-2 border rounded">
+                    <input type="date" id="financeDate" 
+                           class="w-full p-2 border rounded">
+                    <button onclick="categorizeExpense()" 
+                            class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
+                        Categorize Expense
+                    </button>
+                </div>
+                <div id="financeResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+            </div>
+
+            <!-- Social Agent -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-semibold mb-4 text-purple-600">📱 Social Agent</h3>
+                <div class="space-y-4">
+                    <select id="socialPlatform" class="w-full p-2 border rounded">
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="twitter">Twitter</option>
+                    </select>
+                    <input type="text" id="socialTopic" placeholder="Post topic" 
+                           class="w-full p-2 border rounded">
+                    <textarea id="socialContent" placeholder="Content request" 
+                              class="w-full p-2 border rounded h-24"></textarea>
+                    <button onclick="createPost()" 
+                            class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600">
+                        Create Social Post
+                    </button>
+                </div>
+                <div id="socialResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+            </div>
+
+            <!-- Customer Agent -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-semibold mb-4 text-orange-600">🎧 Customer Agent</h3>
+                <div class="space-y-4">
+                    <input type="text" id="customerName" placeholder="Customer name" 
+                           class="w-full p-2 border rounded">
+                    <input type="email" id="customerEmail" placeholder="Customer email" 
+                           class="w-full p-2 border rounded">
+                    <textarea id="customerMessage" placeholder="Customer inquiry" 
+                              class="w-full p-2 border rounded h-24"></textarea>
+                    <button onclick="respondToCustomer()" 
+                            class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
+                        Generate Response
+                    </button>
+                </div>
+                <div id="customerResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
+        let currentSessionId = 'session-' + Date.now();
+
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const config = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                if (data) {
+                    config.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, config);
+                return await response.json();
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        // Chat Functions
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addChatMessage('user', message);
+            input.value = '';
+            
+            // Show typing indicator
+            addTypingIndicator();
+            
+            try {
+                const result = await apiCall('/api/chat', 'POST', {
+                    message: message,
+                    sessionId: currentSessionId
+                });
+                
+                // Remove typing indicator
+                removeTypingIndicator();
+                
+                if (result.status === 'success') {
+                    addChatMessage('assistant', result.response.content);
+                } else {
+                    addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+            }
+        }
+
+        function addChatMessage(role, content) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                role === 'user' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white text-gray-800 border'
+            }`;
+            bubble.textContent = content;
+            
+            messageDiv.appendChild(bubble);
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.className = 'flex justify-start';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bg-gray-200 text-gray-600 px-4 py-2 rounded-lg';
+            bubble.textContent = 'Typing...';
+            
+            typingDiv.appendChild(bubble);
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function clearChat() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '<div class="text-center text-gray-500">Start a conversation with your AI assistant...</div>';
+            
+            // Generate new session ID
+            currentSessionId = 'session-' + Date.now();
+        }
+
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Loading...';
+            
+            const result = await apiCall('/api/status');
+            if (result.status === 'success') {
+                statusDiv.innerHTML = `
+                    <div class="text-green-600">✅ System Online</div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        Agents: ${Object.entries(result.system.agents).map(([name, status]) => 
+                            `${name}: ${status}`).join(', ')}
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = '<div class="text-red-600">❌ System Error</div>';
+            }
+        }
+
+        async function composeEmail() {
+            const recipient = document.getElementById('emailRecipient').value;
+            const subject = document.getElementById('emailSubject').value;
+            const content = document.getElementById('emailContent').value;
+            
+            if (!recipient || !subject || !content) {
+                alert('Please fill all email fields');
+                return;
+            }
+
+            const result = await apiCall('/api/email/compose', 'POST', {
+                recipient, subject, content
+            });
+
+            const resultDiv = document.getElementById('emailResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <h4 class="font-semibold">Generated Email:</h4>
+                <div class="mt-2 whitespace-pre-wrap">${result.result?.content || 'Error generating email'}</div>
+            `;
+        }
+
+        async function categorizeExpense() {
+            const amount = parseFloat(document.getElementById('financeAmount').value);
+            const description = document.getElementById('financeDescription').value;
+            const date = document.getElementById('financeDate').value;
+            
+            if (!amount || !description || !date) {
+                alert('Please fill all finance fields');
+                return;
+            }
+
+            const result = await apiCall('/api/finance/categorize', 'POST', {
+                amount, description, date
+            });
+
+            const resultDiv = document.getElementById('financeResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <h4 class="font-semibold">Expense Analysis:</h4>
+                <div class="mt-2">
+                    <div><strong>Category:</strong> ${result.result?.categorization?.category || 'Unknown'}</div>
+                    <div><strong>Tax Deductible:</strong> ${result.result?.categorization?.taxDeductible ? 'Yes' : 'No'}</div>
+                    <div><strong>Confidence:</strong> ${result.result?.categorization?.confidence || 'Unknown'}</div>
+                </div>
+            `;
+        }
+
+        async function createPost() {
+            const platform = document.getElementById('socialPlatform').value;
+            const topic = document.getElementById('socialTopic').value;
+            const content = document.getElementById('socialContent').value;
+            
+            if (!topic || !content) {
+                alert('Please fill topic and content fields');
+                return;
+            }
+
+            const result = await apiCall('/api/social/create-post', 'POST', {
+                platform, topic, content, tone: 'professional'
+            });
+
+            const resultDiv = document.getElementById('socialResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <h4 class="font-semibold">Generated ${platform} Post:</h4>
+                <div class="mt-2 whitespace-pre-wrap">${result.result?.content || 'Error generating post'}</div>
+                ${result.result?.hashtags ? `<div class="mt-2 text-blue-600">${result.result.hashtags.join(' ')}</div>` : ''}
+            `;
+        }
+
+        async function respondToCustomer() {
+            const name = document.getElementById('customerName').value;
+            const email = document.getElementById('customerEmail').value;
+            const message = document.getElementById('customerMessage').value;
+            
+            if (!name || !email || !message) {
+                alert('Please fill all customer fields');
+                return;
+            }
+
+            const result = await apiCall('/api/customer/respond', 'POST', {
+                customerName: name,
+                email: email,
+                message: message,
+                channel: 'web'
+            });
+
+            const resultDiv = document.getElementById('customerResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <h4 class="font-semibold">Customer Service Response:</h4>
+                <div class="mt-2 whitespace-pre-wrap">${result.result?.response || 'Error generating response'}</div>
+            `;
+        }
+
+        // Load status on page load
+        checkStatus();
+    </script>
+</body>
+</html> 
