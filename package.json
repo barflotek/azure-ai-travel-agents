@@ -1,4 +1,26 @@
 {
+  "name": "business-agent-system",
+  "version": "1.0.0",
+  "description": "Business Agent System with Email, Finance, Social, and Customer Service agents",
+  "main": "src/api/src/basic-api.js",
+  "scripts": {
+    "start": "cd src/api && npm start",
+    "dev": "cd src/api && npm run dev",
+    "build": "cd src/api && npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "business",
+    "automation",
+    "llm",
+    "railway"
+  ],
+  "author": "Bartlomiej Florczak",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@llamaindex/groq": "^0.0.76",
     "@llamaindex/ollama": "^0.1.11",
