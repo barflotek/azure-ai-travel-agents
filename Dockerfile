@@ -15,8 +15,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Set working directory to API
-WORKDIR /app/src/api
-
-# Start the application
-CMD ["npm", "start"] 
+# Start the application from the API directory
+CMD ["sh", "-c", "cd src/api && npm start"] 
