@@ -1,153 +1,343 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import cors from "cors";
-import express from "express";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import { mcpToolsList } from "./mcp/mcp-tools.js";
-import { setupAgents } from "./orchestrator/llamaindex/index.js";
-import { McpToolsConfig } from "./orchestrator/llamaindex/tools/index.js";
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import { 
+  EmailAgent, 
+  FinanceAgent, 
+  SocialAgent, 
+  CustomerAgent, 
+  BusinessAgentOrchestrator 
+} from '../../agents';
+import { SmartLLMRouter } from '../../llm';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
-const CHUNK_END = "\n\n";
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-const apiRouter = express.Router();
-
-// Add request body logging middleware for debugging
-apiRouter.use((req, res, next) => {
-  if (req.path === "/chat" && req.method === "POST") {
-    const contentType = req.headers["content-type"]?.replace(/\n|\r/g, "");
-    const body =
-      typeof req.body === "string"
-        ? req.body.replace(/\n|\r/g, "")
-        : JSON.stringify(req.body).replace(/\n|\r/g, "");
-    console.log("Request Content-Type:", contentType);
-    console.log("Request body:", body);
-  }
-  next();
-});
-
 // Health check endpoint
-apiRouter.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK" });
-});
-
-// MCP tools
-apiRouter.get("/tools", async (req, res) => {
-  try {
-    const tools = await mcpToolsList(Object.values(McpToolsConfig()));
-    console.log("Available tools:", tools);
-    res.status(200).json({ tools });
-  } catch (error) {
-    console.error("Error fetching MCP tools:", error);
-    res.status(500).json({ error: "Error fetching MCP tools" });
-  }
-});
-
-// Chat endpoint with Server-Sent Events (SSE) for streaming responses
-// @ts-ignore - Ignoring TypeScript errors for Express route handlers
-apiRouter.post("/chat", async (req, res) => {
-  req.on("close", () => {
-    console.log("Client disconnected, aborting...");
-  });
-
-  if (!req.body) {
-    console.error(
-      "Request body is undefined. Check Content-Type header in the request."
-    );
-    return res.status(400).json({
-      error:
-        "Request body is undefined. Make sure to set Content-Type to application/json.",
-    });
-  }
-
-  const message = req.body.message;
-  const tools = req.body.tools;
-  console.log("Tools to use:", JSON.stringify(tools, null, 2));
-
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
-  }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  try {
-    const agents = await setupAgents(tools);
-    const context = agents.run(message);
-
-    const readableStream = new Readable({
-      async read() {
-        try {
-          for await (const event of context) {
-            const { displayName, data } = event;
-            const serializedData = JSON.stringify({
-              type: "metadata",
-              agent: (data as any)?.currentAgentName || null,
-              event: displayName,
-              data: data ? JSON.parse(JSON.stringify(data)) : null,
-            });
-            this.push(serializedData + CHUNK_END);
-            console.log("Pushed event:", serializedData);
-          }
-          this.push(null); // Close the stream
-        } catch (error: any) {
-          console.error("Error during streaming:", error?.message);
-          // this.push(
-          //   JSON.stringify({
-          //     type: "error",
-          //     message: "Serialization error",
-          //     error,
-          //   }) + CHUNK_END
-          // );
-        }
-      },
-    });
-
-    await pipeline(readableStream, res);
-  } catch (error) {
-    console.error("Error occurred:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: (error as any).message });
-    } else {
-      res.write(
-        `${JSON.stringify({
-          type: "error",
-          message: (error as any).message,
-        })}` + CHUNK_END
-      );
-      res.end();
-    }
-  }
-});
-
-// Mount the API router with the /api prefix
-app.use("/api", apiRouter);
-
-// Add a root route for API information
-app.get("/", (req, res) => {
+app.get('/', (req, res) => {
   res.json({
-    message: "AI Travel Agents API",
-    version: "1.0.0",
-    endpoints: {
-      health: "/api/health",
-      chat: "/api/chat",
-    },
+    status: 'healthy',
+    service: 'Business Agent System',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`API server running on port ${PORT}`);
-  console.log(`API endpoints:`);
-  console.log(`  - Health check: http://localhost:${PORT}/api/health (GET)`);
-  console.log(`  - MCP Tools: http://localhost:${PORT}/api/tools (GET)`);
-  console.log(`  - Chat: http://localhost:${PORT}/api/chat (POST)`);
+// Health check for Railway
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'Business Agent System',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
+
+// Test endpoint to verify system functionality
+app.get('/test', async (req, res) => {
+  try {
+    const router = new SmartLLMRouter();
+    
+    const response = await router.route([
+      { role: 'user', content: 'Hello, how are you?' }
+    ], 'simple');
+    
+    res.json({
+      status: 'success',
+      message: 'Business Agent System is working!',
+      llmResponse: (response.message?.content as string)?.substring(0, 100) + '...',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'System test failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Individual agent endpoints
+app.post('/api/email', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const emailAgent = new EmailAgent(userId);
+    const result = await emailAgent.processTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'email',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/finance', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const financeAgent = new FinanceAgent(userId);
+    const result = await financeAgent.processTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'finance',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'finance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/social', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const socialAgent = new SocialAgent(userId);
+    const result = await socialAgent.processTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'social',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'social',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/customer', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const customerAgent = new CustomerAgent(userId);
+    const result = await customerAgent.processTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'customer',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'customer',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Orchestrator endpoint for multi-agent tasks
+app.post('/api/orchestrator', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const orchestrator = new BusinessAgentOrchestrator(userId);
+    const result = await orchestrator.processBusinessTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'orchestrator',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'orchestrator',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// System status endpoint
+app.get('/api/status', async (req, res) => {
+  try {
+    const orchestrator = new BusinessAgentOrchestrator('system');
+    const status = await orchestrator.getAgentStatus();
+    
+    res.json({
+      status: 'success',
+      system: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Quick test endpoints for common scenarios
+app.post('/api/quick/email-compose', async (req, res) => {
+  try {
+    const { userId, subject, recipient, content } = req.body;
+    
+    if (!userId || !subject || !recipient || !content) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId, subject, recipient, and content are required'
+      });
+    }
+    
+    const emailAgent = new EmailAgent(userId);
+    const result = await emailAgent.processTask({
+      type: 'compose',
+      subject,
+      recipient,
+      content
+    });
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'compose',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/quick/customer-complaint', async (req, res) => {
+  try {
+    const { userId, customerData } = req.body;
+    
+    if (!userId || !customerData) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and customerData are required'
+      });
+    }
+    
+    const orchestrator = new BusinessAgentOrchestrator(userId);
+    const result = await orchestrator.handleCustomerComplaint(customerData);
+    
+    res.json({
+      status: 'success',
+      agent: 'orchestrator',
+      task: 'customer_complaint',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: 'Endpoint not found',
+    availableEndpoints: [
+      'GET /',
+      'GET /health',
+      'GET /test',
+      'GET /api/status',
+      'POST /api/email',
+      'POST /api/finance',
+      'POST /api/social',
+      'POST /api/customer',
+      'POST /api/orchestrator',
+      'POST /api/quick/email-compose',
+      'POST /api/quick/customer-complaint'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Business Agent System API running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`📋 API status: http://localhost:${PORT}/api/status`);
+});
+
+export default app;

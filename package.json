@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@llamaindex/groq": "^0.0.76",
+    "@llamaindex/ollama": "^0.1.11",
+    "@supabase/supabase-js": "^2.50.2",
+    "dotenv": "^16.6.0"
+  }
+}
