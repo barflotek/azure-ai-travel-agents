@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Agent System</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .voice-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+        .voice-wave {
+            animation: wave 2s infinite;
+        }
+        @keyframes wave {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(1.5); }
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto p-8">
@@ -23,11 +39,24 @@
                     </div>
                 </div>
                 
-                <!-- Chat Input -->
+                <!-- Voice Status Indicator -->
+                <div id="voiceStatus" class="hidden mb-2 p-2 rounded text-center text-sm">
+                    <div id="voiceStatusText" class="font-medium"></div>
+                    <div id="voiceStatusDetails" class="text-xs text-gray-600"></div>
+                </div>
+                
+                <!-- Chat Input with Voice -->
                 <div class="flex space-x-2">
                     <input type="text" id="chatInput" placeholder="Type your message here..." 
                            class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                            onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                    
+                    <!-- Voice Input Button -->
+                    <button id="voiceButton" onclick="toggleVoiceInput()" 
+                            class="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-200">
+                        <span id="voiceIcon">🎤</span>
+                    </button>
+                    
                     <button onclick="sendChatMessage()" 
                             class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         Send
@@ -36,6 +65,28 @@
                             class="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         Clear
                     </button>
+                </div>
+                
+                <!-- Voice Controls -->
+                <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="autoSpeak" checked>
+                                <span class="text-sm">Auto-speak responses</span>
+                            </label>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="continuousMode">
+                                <span class="text-sm">Continuous listening</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600">Voice:</span>
+                            <select id="voiceSelect" class="text-sm border rounded px-2 py-1">
+                                <option value="">Auto</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -130,6 +181,218 @@
     <script>
         const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
         let currentSessionId = 'session-' + Date.now();
+        
+        // Voice-related variables
+        let recognition = null;
+        let synthesis = null;
+        let isListening = false;
+        let isSpeaking = false;
+        let continuousMode = false;
+
+        // Initialize voice capabilities
+        function initVoice() {
+            // Initialize Speech Recognition
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = () => {
+                    isListening = true;
+                    updateVoiceUI('listening');
+                };
+                
+                recognition.onresult = (event) => {
+                    const transcript = Array.from(event.results)
+                        .map(result => result[0])
+                        .map(result => result.transcript)
+                        .join('');
+                    
+                    document.getElementById('chatInput').value = transcript;
+                    
+                    if (event.results[0].isFinal) {
+                        if (transcript.toLowerCase().includes('hey agent') || transcript.toLowerCase().includes('hello agent')) {
+                            // Wake word detected
+                            document.getElementById('chatInput').value = transcript.replace(/hey agent|hello agent/gi, '').trim();
+                            if (document.getElementById('chatInput').value) {
+                                sendChatMessage();
+                            }
+                        }
+                    }
+                };
+                
+                recognition.onend = () => {
+                    isListening = false;
+                    updateVoiceUI('idle');
+                    
+                    // Restart if continuous mode is enabled
+                    if (continuousMode && !isSpeaking) {
+                        setTimeout(() => {
+                            if (continuousMode) {
+                                startVoiceInput();
+                            }
+                        }, 1000);
+                    }
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    isListening = false;
+                    updateVoiceUI('error', event.error);
+                };
+            } else {
+                console.warn('Speech recognition not supported');
+                document.getElementById('voiceButton').disabled = true;
+                document.getElementById('voiceButton').title = 'Speech recognition not supported';
+            }
+            
+            // Initialize Speech Synthesis
+            if ('speechSynthesis' in window) {
+                synthesis = window.speechSynthesis;
+                loadVoices();
+                
+                // Handle voice loading
+                synthesis.onvoiceschanged = loadVoices;
+            } else {
+                console.warn('Speech synthesis not supported');
+                document.getElementById('autoSpeak').disabled = true;
+            }
+        }
+        
+        // Load available voices
+        function loadVoices() {
+            const voiceSelect = document.getElementById('voiceSelect');
+            const voices = synthesis.getVoices();
+            
+            voiceSelect.innerHTML = '<option value="">Auto</option>';
+            
+            voices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+        }
+        
+        // Toggle voice input
+        function toggleVoiceInput() {
+            if (isListening) {
+                stopVoiceInput();
+            } else {
+                startVoiceInput();
+            }
+        }
+        
+        // Start voice input
+        function startVoiceInput() {
+            if (recognition && !isListening) {
+                recognition.start();
+            }
+        }
+        
+        // Stop voice input
+        function stopVoiceInput() {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        }
+        
+        // Update voice UI
+        function updateVoiceUI(state, details = '') {
+            const voiceButton = document.getElementById('voiceButton');
+            const voiceIcon = document.getElementById('voiceIcon');
+            const voiceStatus = document.getElementById('voiceStatus');
+            const voiceStatusText = document.getElementById('voiceStatusText');
+            const voiceStatusDetails = document.getElementById('voiceStatusDetails');
+            
+            voiceButton.className = 'px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200';
+            
+            switch (state) {
+                case 'listening':
+                    voiceButton.className += ' bg-red-600 text-white voice-pulse';
+                    voiceIcon.textContent = '🔴';
+                    voiceStatus.className = 'mb-2 p-2 rounded text-center text-sm bg-red-100 text-red-800';
+                    voiceStatusText.textContent = 'Listening...';
+                    voiceStatusDetails.textContent = 'Speak now';
+                    voiceStatus.classList.remove('hidden');
+                    break;
+                    
+                case 'speaking':
+                    voiceButton.className += ' bg-green-600 text-white voice-pulse';
+                    voiceIcon.textContent = '🟢';
+                    voiceStatus.className = 'mb-2 p-2 rounded text-center text-sm bg-green-100 text-green-800';
+                    voiceStatusText.textContent = 'Speaking...';
+                    voiceStatusDetails.textContent = details;
+                    voiceStatus.classList.remove('hidden');
+                    break;
+                    
+                case 'error':
+                    voiceButton.className += ' bg-yellow-600 text-white';
+                    voiceIcon.textContent = '⚠️';
+                    voiceStatus.className = 'mb-2 p-2 rounded text-center text-sm bg-yellow-100 text-yellow-800';
+                    voiceStatusText.textContent = 'Voice Error';
+                    voiceStatusDetails.textContent = details;
+                    voiceStatus.classList.remove('hidden');
+                    break;
+                    
+                default:
+                    voiceButton.className += ' bg-red-500 text-white hover:bg-red-600';
+                    voiceIcon.textContent = '🎤';
+                    voiceStatus.classList.add('hidden');
+                    break;
+            }
+        }
+        
+        // Speak text
+        function speakText(text) {
+            if (!synthesis || !document.getElementById('autoSpeak').checked) return;
+            
+            // Stop any current speech
+            synthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Set voice if selected
+            const selectedVoice = document.getElementById('voiceSelect').value;
+            if (selectedVoice) {
+                const voices = synthesis.getVoices();
+                const voice = voices.find(v => v.name === selectedVoice);
+                if (voice) utterance.voice = voice;
+            }
+            
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 0.8;
+            
+            utterance.onstart = () => {
+                isSpeaking = true;
+                updateVoiceUI('speaking', 'Agent is speaking...');
+            };
+            
+            utterance.onend = () => {
+                isSpeaking = false;
+                updateVoiceUI('idle');
+                
+                // Restart continuous listening if enabled
+                if (continuousMode) {
+                    setTimeout(() => {
+                        if (continuousMode && !isListening) {
+                            startVoiceInput();
+                        }
+                    }, 500);
+                }
+            };
+            
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event.error);
+                isSpeaking = false;
+                updateVoiceUI('error', 'Speech synthesis failed');
+            };
+            
+            synthesis.speak(utterance);
+        }
 
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
@@ -175,6 +438,9 @@
                 
                 if (result.status === 'success') {
                     addChatMessage('assistant', result.response.content);
+                    
+                    // Speak the response
+                    speakText(result.response.content);
                 } else {
                     addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
                 }
@@ -233,6 +499,16 @@
             // Generate new session ID
             currentSessionId = 'session-' + Date.now();
         }
+
+        // Event listeners for voice controls
+        document.getElementById('continuousMode').addEventListener('change', function() {
+            continuousMode = this.checked;
+            if (continuousMode && !isListening && !isSpeaking) {
+                setTimeout(() => startVoiceInput(), 1000);
+            } else if (!continuousMode && isListening) {
+                stopVoiceInput();
+            }
+        });
 
         async function checkStatus() {
             const statusDiv = document.getElementById('status');
@@ -348,8 +624,11 @@
             `;
         }
 
-        // Load status on page load
-        checkStatus();
+        // Initialize everything when page loads
+        window.addEventListener('load', function() {
+            initVoice();
+            checkStatus();
+        });
     </script>
 </body>
 </html> 
