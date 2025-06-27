@@ -1,0 +1,60 @@
+export interface GmailMessage {
+  id: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: Date;
+  body: string;
+  isRead: boolean;
+  snippet?: string;
+  labels?: string[];
+}
+
+export interface GmailAuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  scope: string;
+  token_type: string;
+  expiry_date?: number;
+}
+
+export interface EmailSummary {
+  id: string;
+  from: string;
+  subject: string;
+  summary: string;
+  requiresAction: boolean;
+  date: Date;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface SendEmailResult {
+  success: boolean;
+  message: string;
+  details: {
+    to: string;
+    subject: string;
+    sentAt: string;
+    messageId?: string;
+  };
+}
+
+export interface GmailCheckResult {
+  totalEmails: number;
+  unreadCount: number;
+  summaries: EmailSummary[];
+  recentEmails: Array<{
+    from: string;
+    subject: string;
+    date: Date;
+    preview: string;
+    isRead: boolean;
+  }>;
+}
+
+export interface GmailAuthStatus {
+  isConnected: boolean;
+  email?: string;
+  scopes?: string[];
+  lastSync?: Date;
+} 

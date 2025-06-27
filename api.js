@@ -51,6 +51,125 @@ app.get('/test', (req, res) => {
   }
 });
 
+// Gmail Authentication Routes
+import gmailAuthRoutes from './src/api/routes/gmail-auth.js';
+app.use('/api', gmailAuthRoutes);
+
+// Gmail-specific endpoints
+app.post('/api/gmail/check-emails', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Gmail access token required'
+      });
+    }
+
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.checkEmails();
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'check_emails',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail check emails error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to check emails',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/gmail/send-email', async (req, res) => {
+  try {
+    const { accessToken, to, subject, content } = req.body;
+    
+    if (!accessToken || !to || !subject || !content) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'accessToken, to, subject, and content are required'
+      });
+    }
+
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.sendRealEmail({
+      type: 'send_real_email',
+      recipient: to,
+      subject,
+      content
+    });
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'send_real_email',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail send email error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to send email',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/gmail/search-emails', async (req, res) => {
+  try {
+    const { accessToken, query } = req.body;
+    
+    if (!accessToken || !query) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'accessToken and query are required'
+      });
+    }
+
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.searchEmails(query);
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'search_emails',
+      result: {
+        query,
+        emails: result,
+        count: result.length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail search emails error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to search emails',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Email composition endpoint (mock)
 app.post('/api/email/compose', (req, res) => {
   try {
@@ -262,6 +381,9 @@ app.get('/api/status', (req, res) => {
           social: 'active',
           customer: 'active'
         },
+        integrations: {
+          gmail: process.env.GMAIL_CLIENT_ID ? 'configured' : 'not_configured'
+        },
         llmProviders: {
           ollama: 'configured',
           groq: 'configured'
@@ -280,10 +402,10 @@ app.get('/api/status', (req, res) => {
   }
 });
 
-// Chat endpoint for conversational interactions
+// Enhanced Chat endpoint with Gmail support
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, sessionId = 'default-session' } = req.body;
+    const { message, sessionId = 'default-session', gmailAccessToken } = req.body;
     
     if (!message) {
       return res.status(400).json({
@@ -295,6 +417,14 @@ app.post('/api/chat', async (req, res) => {
     // Import the Main Conversational Agent
     const { MainConversationalAgent } = await import('./src/agents/conversational/main-agent.js');
     const conversationalAgent = new MainConversationalAgent();
+    
+    // Set Gmail access if provided
+    if (gmailAccessToken) {
+      const { EmailAgent } = await import('./src/agents/email/email-agent.js');
+      const emailAgent = new EmailAgent(sessionId);
+      emailAgent.setGmailAccess(gmailAccessToken);
+      conversationalAgent.setEmailAgent(emailAgent);
+    }
     
     // Process the message
     const response = await conversationalAgent.processMessage(sessionId, message);
@@ -377,6 +507,14 @@ app.use('*', (req, res) => {
       'GET /health',
       'GET /test',
       'GET /api/status',
+      'GET /api/auth/gmail',
+      'GET /api/auth/gmail/callback',
+      'POST /api/auth/gmail/refresh',
+      'GET /api/auth/gmail/status',
+      'POST /api/auth/gmail/revoke',
+      'POST /api/gmail/check-emails',
+      'POST /api/gmail/send-email',
+      'POST /api/gmail/search-emails',
       'POST /api/email/compose',
       'POST /api/finance/categorize',
       'POST /api/social/create-post',
@@ -395,6 +533,7 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
   console.log(`📋 API status: http://localhost:${PORT}/api/status`);
+  console.log(`📧 Gmail auth: http://localhost:${PORT}/api/auth/gmail`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
