@@ -16,8 +16,8 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Create a startup script
-RUN echo '#!/bin/sh\ncd /app/src/api\nnpm start' > /app/start.sh && chmod +x /app/start.sh
+# Force rebuild by adding a unique layer
+RUN echo "Business Agent System - $(date)" > /app/build-info.txt
 
-# Start the application
-CMD ["/app/start.sh"] 
+# Start the application directly from the API directory
+CMD ["node", "/app/src/api/src/basic-api.js"] 
