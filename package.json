@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node api.js",
-    "dev": "node api.js"
+    "dev": "node api.js",
+    "build": "echo 'Build complete'"
   },
   "keywords": [
     "ai",
@@ -14,12 +15,13 @@
     "business",
     "automation",
     "llm",
-    "railway"
+    "railway",
+    "nodejs"
   ],
   "author": "Bartlomiej Florczak",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "dependencies": {
     "cors": "^2.8.5",
