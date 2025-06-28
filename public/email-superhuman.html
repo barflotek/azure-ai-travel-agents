@@ -7,10 +7,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Force light theme only - no dark mode */
+        body {
+            background-color: #f9fafb !important;
+            color: #111827 !important;
+        }
+        
         /* Superhuman-style animations and effects */
         .email-item {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             contain: layout style paint;
+            background-color: white !important;
+            color: #111827 !important;
         }
         
         .email-item:hover {
@@ -20,7 +28,7 @@
         
         .email-item.selected {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            color: white !important;
         }
         
         .priority-high { border-left: 3px solid #ef4444; }
@@ -29,11 +37,8 @@
         
         .command-palette {
             backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.95);
-        }
-        
-        .dark .command-palette {
-            background: rgba(17, 24, 39, 0.95);
+            background: rgba(255, 255, 255, 0.95) !important;
+            color: #111827 !important;
         }
         
         .custom-scrollbar::-webkit-scrollbar {
@@ -73,19 +78,44 @@
             height: calc(100vh - 200px);
             overflow-y: auto;
         }
+        
+        /* Force all text to be dark */
+        * {
+            color: #111827 !important;
+        }
+        
+        /* Force white backgrounds */
+        header, .bg-white, .bg-gray-50, .bg-gray-100 {
+            background-color: white !important;
+        }
+        
+        /* Force dark text on all elements */
+        h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea {
+            color: #111827 !important;
+        }
+        
+        /* Email content specific styling */
+        .email-content {
+            color: #111827 !important;
+            background-color: white !important;
+        }
+        
+        .email-body {
+            color: #111827 !important;
+        }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+<body class="bg-gray-50 min-h-screen">
     <!-- Command Palette -->
     <div id="commandPalette" class="fixed inset-0 z-50 flex items-start justify-center pt-20 hidden">
         <div class="command-palette rounded-xl shadow-2xl w-full max-w-2xl mx-4">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-200">
                 <div class="flex items-center space-x-3">
                     <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                     <input id="commandInput" type="text" placeholder="Search emails, compose, or use commands..." 
-                           class="flex-1 bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-500">
+                           class="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-500">
                 </div>
             </div>
             <div id="commandResults" class="max-h-96 overflow-y-auto">
@@ -95,7 +125,7 @@
     </div>
 
     <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <header class="bg-white border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center space-x-8">
@@ -105,7 +135,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                             </svg>
                         </div>
-                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Superhuman Email</h1>
+                        <h1 class="text-xl font-semibold text-gray-900">Superhuman Email</h1>
                     </div>
                     
                     <!-- Category Tabs -->
@@ -130,7 +160,7 @@
                 
                 <div class="flex items-center space-x-4">
                     <!-- Search -->
-                    <button onclick="openCommandPalette()" class="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                    <button onclick="openCommandPalette()" class="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
@@ -142,15 +172,8 @@
                         Compose
                     </button>
                     
-                    <!-- Dark mode toggle -->
-                    <button id="darkModeToggle" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
-                    </button>
-                    
                     <!-- Back to main dashboard -->
-                    <a href="/" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                    <a href="/" class="text-gray-600 hover:text-gray-900">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg>
@@ -161,18 +184,18 @@
     </header>
 
     <!-- Main Content -->
-    <div class="flex h-screen bg-white dark:bg-gray-900">
+    <div class="flex h-screen bg-white">
         <!-- Email List -->
-        <div class="w-1/2 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        <div class="w-1/2 border-r border-gray-200 flex flex-col">
             <!-- Email List Header -->
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-200">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-4">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white" id="categoryTitle">All Emails</h2>
+                        <h2 class="text-lg font-semibold text-gray-900" id="categoryTitle">All Emails</h2>
                         <span id="unreadBadge" class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">0</span>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button onclick="refreshEmails()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                        <button onclick="refreshEmails()" class="p-2 text-gray-600 hover:text-gray-900">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
@@ -181,10 +204,10 @@
                 </div>
                 
                 <!-- Gmail Connection Status -->
-                <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="mt-3 p-3 bg-gray-50 rounded-lg">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-2">
-                            <span id="gmailStatus" class="text-sm text-gray-600 dark:text-gray-400">Checking Gmail connection...</span>
+                            <span id="gmailStatus" class="text-sm text-gray-600">Checking Gmail connection...</span>
                         </div>
                         <div id="gmailActions">
                             <button onclick="connectGmail()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
@@ -210,7 +233,7 @@
                         <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                         </svg>
-                        <p class="text-gray-500 dark:text-gray-400">Select an email to view</p>
+                        <p class="text-gray-500">Select an email to view</p>
                     </div>
                 </div>
             </div>
@@ -242,7 +265,6 @@
         function initializeSupermanInterface() {
             setupKeyboardShortcuts();
             setupCommandPalette();
-            setupDarkMode();
             checkGmailAuthCallback();
             loadGmailToken();
             checkGmailConnection();
@@ -435,7 +457,7 @@
                             <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                             </svg>
-                            <p class="text-gray-500 dark:text-gray-400">No emails found</p>
+                            <p class="text-gray-500">No emails found</p>
                         </div>
                     </div>
                 `;
@@ -443,7 +465,7 @@
             }
             
             container.innerHTML = filteredEmails.map((email, index) => `
-                <div class="email-item p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer ${getPriorityClass(email.priority)} ${index === currentEmailIndex ? 'selected' : ''}" 
+                <div class="email-item p-4 border-b border-gray-100 cursor-pointer ${getPriorityClass(email.priority)} ${index === currentEmailIndex ? 'selected' : ''}" 
                      data-index="${index}" onclick="selectEmail(${index})">
                     <div class="flex items-start space-x-3">
                         <div class="flex-shrink-0">
@@ -451,17 +473,17 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                <p class="text-sm font-medium text-gray-900 truncate">
                                     ${getSenderName(email.from)}
                                 </p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                <p class="text-xs text-gray-500">
                                     ${formatTime(email.date)}
                                 </p>
                             </div>
-                            <p class="text-sm text-gray-900 dark:text-white font-medium truncate">
+                            <p class="text-sm text-gray-900 font-medium truncate">
                                 ${email.subject}
                             </p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            <p class="text-sm text-gray-500 truncate">
                                 ${email.snippet || email.body?.substring(0, 100) || ''}
                             </p>
                         </div>
@@ -526,24 +548,24 @@
             container.innerHTML = `
                 <div class="flex flex-col h-full">
                     <!-- Email Header -->
-                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="p-6 border-b border-gray-200">
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
-                                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                <h2 class="text-xl font-semibold text-gray-900 mb-2">
                                     ${selectedEmail.subject}
                                 </h2>
-                                <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                <div class="flex items-center space-x-4 text-sm text-gray-600">
                                     <span>From: ${selectedEmail.from}</span>
                                     <span>${formatFullDate(selectedEmail.date)}</span>
                                 </div>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <button onclick="replyToEmail()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" title="Reply (R)">
+                                <button onclick="replyToEmail()" class="p-2 text-gray-600 hover:text-gray-900" title="Reply (R)">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
                                     </svg>
                                 </button>
-                                <button onclick="archiveEmail()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" title="Archive (E)">
+                                <button onclick="archiveEmail()" class="p-2 text-gray-600 hover:text-gray-900" title="Archive (E)">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
                                     </svg>
@@ -558,7 +580,7 @@
                         
                         <!-- AI Summary -->
                         ${selectedEmail.summary ? `
-                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 mt-4">
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mt-4">
                                 <div class="flex items-start space-x-3">
                                     <div class="flex-shrink-0">
                                         <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -568,8 +590,8 @@
                                         </div>
                                     </div>
                                     <div class="flex-1">
-                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">AI Summary</h3>
-                                        <p class="text-sm text-gray-700 dark:text-gray-300">${selectedEmail.summary}</p>
+                                        <h3 class="text-sm font-semibold text-gray-900 mb-1">AI Summary</h3>
+                                        <p class="text-sm text-gray-700">${selectedEmail.summary}</p>
                                         ${selectedEmail.requiresAction ? '<p class="text-xs text-orange-600 font-medium mt-2">⚡ Action required</p>' : ''}
                                     </div>
                                 </div>
@@ -579,13 +601,13 @@
                     
                     <!-- Email Content -->
                     <div class="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                        <div class="email-content prose max-w-none dark:prose-invert">
+                        <div class="email-content prose max-w-none">
                             ${formatEmailBody(selectedEmail.body)}
                         </div>
                     </div>
                     
                     <!-- Quick Reply -->
-                    <div class="border-t border-gray-200 dark:border-gray-700 p-4">
+                    <div class="border-t border-gray-200 p-4">
                         <div class="flex items-center space-x-3">
                             <button onclick="quickReply('positive')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
                                 Quick Reply
@@ -716,7 +738,7 @@
             
             if (!query) {
                 results.innerHTML = `
-                    <div class="p-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div class="p-4 text-sm text-gray-500">
                         Type to search emails, compose, or use commands...
                     </div>
                 `;
@@ -736,8 +758,8 @@
             );
             
             results.innerHTML = filteredCommands.map(cmd => `
-                <div class="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" onclick="closeCommandPalette(); ${cmd.action.toString()}()">
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">${cmd.name}</div>
+                <div class="p-3 hover:bg-gray-100 cursor-pointer" onclick="closeCommandPalette(); ${cmd.action.toString()}()">
+                    <div class="text-sm font-medium">${cmd.name}</div>
                 </div>
             `).join('');
         }
@@ -758,29 +780,13 @@
         function updateCategoryTabs() {
             document.querySelectorAll('.category-tab').forEach((tab, index) => {
                 if (index === currentCategory) {
-                    tab.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-300');
-                    tab.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:text-gray-900', 'dark:hover:text-white');
+                    tab.classList.add('bg-blue-100', 'text-blue-700');
+                    tab.classList.remove('text-gray-600', 'hover:text-gray-900');
                 } else {
-                    tab.classList.remove('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-300');
-                    tab.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:text-gray-900', 'dark:hover:text-white');
+                    tab.classList.remove('bg-blue-100', 'text-blue-700');
+                    tab.classList.add('text-gray-600', 'hover:text-gray-900');
                 }
             });
-        }
-
-        // Dark mode toggle
-        function setupDarkMode() {
-            const darkModeToggle = document.getElementById('darkModeToggle');
-            const html = document.documentElement;
-            
-            darkModeToggle.addEventListener('click', () => {
-                html.classList.toggle('dark');
-                localStorage.setItem('darkMode', html.classList.contains('dark'));
-            });
-            
-            // Load saved preference
-            if (localStorage.getItem('darkMode') === 'true') {
-                html.classList.add('dark');
-            }
         }
 
         // Utility functions
@@ -830,7 +836,7 @@
         }
 
         function formatEmailBody(body) {
-            if (!body) return '<p class="text-gray-500 dark:text-gray-400 italic">No content available</p>';
+            if (!body) return '<p class="text-gray-500 italic">No content available</p>';
             
             // Convert plain text to HTML with proper formatting
             return body
@@ -845,13 +851,13 @@
         function showEmailListSkeleton() {
             const container = document.getElementById('emailListContainer');
             const skeletonItems = Array(8).fill(0).map(() => `
-                <div class="p-4 border-b border-gray-100 dark:border-gray-700">
+                <div class="p-4 border-b border-gray-100">
                     <div class="flex items-start space-x-3">
-                        <div class="w-2 h-2 bg-gray-200 dark:bg-gray-600 rounded-full mt-1 skeleton"></div>
+                        <div class="w-2 h-2 bg-gray-200 rounded-full mt-1 skeleton"></div>
                         <div class="flex-1 space-y-2">
-                            <div class="h-4 bg-gray-200 dark:bg-gray-600 rounded skeleton w-1/3"></div>
-                            <div class="h-3 bg-gray-200 dark:bg-gray-600 rounded skeleton w-3/4"></div>
-                            <div class="h-3 bg-gray-200 dark:bg-gray-600 rounded skeleton w-1/2"></div>
+                            <div class="h-4 bg-gray-200 rounded skeleton w-1/3"></div>
+                            <div class="h-3 bg-gray-200 rounded skeleton w-3/4"></div>
+                            <div class="h-3 bg-gray-200 rounded skeleton w-1/2"></div>
                         </div>
                     </div>
                 </div>
@@ -868,8 +874,8 @@
                         <svg class="w-12 h-12 text-red-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <p class="text-gray-500 dark:text-gray-400 font-medium">${message}</p>
-                        <button onclick="loadEmails()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Try again</button>
+                        <p class="text-gray-500 font-medium">${message}</p>
+                        <button onclick="loadEmails()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">Try again</button>
                     </div>
                 </div>
             `;
@@ -1043,11 +1049,11 @@
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
             modal.innerHTML = `
-                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
-                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Compose Email</h3>
-                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <h3 class="text-lg font-semibold text-gray-900">Compose Email</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
@@ -1056,23 +1062,23 @@
                     </div>
                     <div class="p-6 space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
-                            <input type="email" id="composeTo" value="${data.to || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+                            <input type="email" id="composeTo" value="${data.to || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-                            <input type="text" id="composeSubject" value="${data.subject || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                            <input type="text" id="composeSubject" value="${data.subject || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
-                            <textarea id="composeBody" rows="8" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">${data.body || ''}</textarea>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea id="composeBody" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900">${data.body || ''}</textarea>
                         </div>
                         <div class="flex justify-between items-center pt-4">
                             <button onclick="enhanceWithAI()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
                                 🤖 AI Enhance
                             </button>
                             <div class="space-x-3">
-                                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100">
+                                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800">
                                     Cancel
                                 </button>
                                 <button onclick="sendEmail()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
@@ -1154,4 +1160,5 @@
         document.addEventListener('DOMContentLoaded', initializeSupermanInterface);
     </script>
 </body>
+</html> 
 </html> 
