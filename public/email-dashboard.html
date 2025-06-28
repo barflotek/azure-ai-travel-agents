@@ -233,6 +233,50 @@
         [data-theme="dark"] #emailModalContent .email-body {
             color: #f8fafc !important;
         }
+
+        /* Force dark mode text colors with !important */
+        [data-theme="dark"] .email-modal-content *,
+        [data-theme="dark"] .email-body *,
+        [data-theme="dark"] .prose *,
+        [data-theme="dark"] .email-content *,
+        html.dark .email-modal-content *,
+        html.dark .email-body *,
+        html.dark .prose *,
+        html.dark .email-content * {
+            color: #f1f5f9 !important;
+        }
+        
+        [data-theme="dark"] .email-modal,
+        html.dark .email-modal {
+            background-color: #1f2937 !important;
+        }
+        
+        [data-theme="dark"] .email-modal-header,
+        html.dark .email-modal-header {
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+        }
+
+        /* Additional dark mode overrides for maximum visibility */
+        [data-theme="dark"] .prose-invert,
+        html.dark .prose-invert {
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] .prose-invert p,
+        html.dark .prose-invert p {
+            color: #f8fafc !important;
+        }
+
+        /* Force all text in dark mode to be visible */
+        [data-theme="dark"] .email-modal-content,
+        [data-theme="dark"] .email-body,
+        [data-theme="dark"] .prose,
+        html.dark .email-modal-content,
+        html.dark .email-body,
+        html.dark .prose {
+            color: #f8fafc !important;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -562,33 +606,74 @@
     </div>
 
     <script>
-        const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
+        // Configuration
+        const API_BASE = window.location.origin.includes('localhost') 
+            ? 'http://localhost:3000' 
+            : 'https://azure-ai-travel-agents-production.up.railway.app';
+        
+        // Global variables
         let gmailAccessToken = null;
         let emails = [];
         let filteredEmails = [];
         let selectedEmails = new Set();
-        let priorityChart = null;
-        let filterTimeout = null;
         let currentPage = 0;
         const emailsPerPage = 20;
         let isLoading = false;
-
-        // ElevenLabs Configuration (Free tier: 10K chars/month)
-        let ELEVENLABS_API_KEY = ''; // Will be loaded from backend
-        const ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel voice (natural)
+        let currentSessionId = 'default-session';
         
-        // Voice System Variables
+        // Voice system variables
         let recognition = null;
         let synthesis = null;
+        let selectedVoice = null;
         let isListening = false;
         let isSpeaking = false;
         let conversationMode = false;
         let silenceTimer = null;
-        let finalTranscript = '';
-        let selectedVoice = null;
-        let voiceQuality = 'browser'; // 'browser' or 'premium'
+        
+        // ElevenLabs configuration
+        let ELEVENLABS_API_KEY = '';
+        
+        // Chart variables
+        let priorityChart = null;
+        
+        // Simple caching system for better performance
+        const emailCache = {
+            data: null,
+            timestamp: 0,
+            ttl: 2 * 60 * 1000, // 2 minutes
+            
+            get() {
+                if (this.data && Date.now() - this.timestamp < this.ttl) {
+                    return this.data;
+                }
+                return null;
+            },
+            
+            set(data) {
+                this.data = data;
+                this.timestamp = Date.now();
+            },
+            
+            clear() {
+                this.data = null;
+                this.timestamp = 0;
+            }
+        };
+        
+        // Element cache for performance
+        const elementCache = new Map();
+        function getCachedElement(id) {
+            if (!elementCache.has(id)) {
+                elementCache.set(id, document.getElementById(id));
+            }
+            return elementCache.get(id);
+        }
 
+        // ElevenLabs Configuration (Free tier: 10K chars/month)
+        const ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel voice (natural)
+        
         // Performance optimization: Debounced filtering
+        let filterTimeout = null;
         function debounce(func, wait) {
             return function executedFunction(...args) {
                 const later = () => {
@@ -672,6 +757,27 @@
                     notification.parentNode.removeChild(notification);
                 }
             }, 5000);
+        }
+
+        // Enhanced error handling
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showLoading() {
+            const statusDiv = document.getElementById('gmailStatus');
+            if (statusDiv) {
+                statusDiv.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <span>Loading emails...</span>
+                    </div>
+                `;
+            }
         }
 
         // Gmail token management
@@ -893,7 +999,19 @@
                 return;
             }
 
+            // Check cache first
+            const cached = emailCache.get();
+            if (cached) {
+                console.log('📦 Using cached emails');
+                emails = cached;
+                filteredEmails = [...emails];
+                updateEmailList();
+                updateStats();
+                return;
+            }
+
             isLoading = true;
+            showLoading();
             
             // Show loading state with performance indicator
             const emailListDiv = document.getElementById('emailList');
@@ -918,18 +1036,21 @@
                 console.log('API_BASE:', API_BASE);
                 console.log('Gmail token available:', !!gmailAccessToken);
                 
-                // Use the fast loading endpoint for better performance
-                const result = await apiCall('/api/gmail/emails-fast', 'POST', {
-                    accessToken: gmailAccessToken,
-                    maxResults: 50
+                // Try the check-emails endpoint first (more reliable)
+                const result = await apiCall('/api/gmail/check-emails', 'POST', {
+                    accessToken: gmailAccessToken
                 });
 
                 const loadTime = Date.now() - startTime;
                 console.log('📧 API response:', result);
 
-                if (result.status === 'success') {
+                if (result.status === 'success' && result.result) {
                     emails = result.result.recentEmails || [];
                     console.log(`✅ Loaded ${emails.length} emails`);
+                    
+                    // Cache the results
+                    emailCache.set(emails);
+                    
                     updateEmailList();
                     updateStats();
                     
@@ -961,10 +1082,10 @@
                     emailListDiv.innerHTML = `
                         <div class="text-center text-red-500 py-8">
                             <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                            <p>Failed to load emails: ${result.message}</p>
+                            <p>Failed to load emails: ${result.message || 'Invalid response format'}</p>
                         </div>
                     `;
-                    showNotification(`Failed to load emails: ${result.message}`, 'error');
+                    showNotification(`Failed to load emails: ${result.message || 'Invalid response format'}`, 'error');
                 }
             } catch (error) {
                 console.error('❌ Error loading emails:', error);
@@ -1520,6 +1641,10 @@
                     stack: error.stack,
                     name: error.name
                 });
+                
+                // Show user-friendly error
+                showError(`Network error: ${error.message}`);
+                
                 return { 
                     status: 'error',
                     message: error.message || 'Network error',
