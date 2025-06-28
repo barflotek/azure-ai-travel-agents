@@ -1,4 +1,21 @@
-const fetch = require('node-fetch');
+// Use built-in fetch if available (Node.js 18+), otherwise use dynamic import
+let fetch;
+
+if (typeof globalThis.fetch === 'function') {
+  fetch = globalThis.fetch;
+} else {
+  // Fallback for older Node.js versions
+  try {
+    const nodeFetch = require('node-fetch');
+    fetch = nodeFetch.default || nodeFetch;
+  } catch (error) {
+    console.error('Fetch not available. Please install node-fetch or use Node.js 18+');
+    // Create a mock fetch for fallback
+    fetch = async () => {
+      throw new Error('Fetch not available');
+    };
+  }
+}
 
 class KnowledgeService {
   constructor(baseUrl = 'http://localhost:9380') {
