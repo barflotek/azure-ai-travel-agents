@@ -269,6 +269,91 @@
             <div id="statusContent" class="text-gray-600">Loading...</div>
         </div>
 
+        <!-- Unified Chat Interface -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">🤖 AI Agent Chat</h3>
+                <div class="flex space-x-2">
+                    <button onclick="toggleChat()" id="toggleChatBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-comments mr-2"></i>Toggle Chat
+                    </button>
+                    <button onclick="clearChat()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                        <i class="fas fa-trash mr-2"></i>Clear
+                    </button>
+                </div>
+            </div>
+            
+            <div id="chatInterface" class="hidden">
+                <!-- Agent Selection -->
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Agent:</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="selectAgent('general')" class="agent-btn bg-blue-100 text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-200 transition-colors" data-agent="general">
+                            <i class="fas fa-robot mr-1"></i>General
+                        </button>
+                        <button onclick="selectAgent('knowledge')" class="agent-btn bg-purple-100 text-purple-800 px-3 py-1 rounded-lg hover:bg-purple-200 transition-colors" data-agent="knowledge">
+                            <i class="fas fa-brain mr-1"></i>Knowledge
+                        </button>
+                        <button onclick="selectAgent('email')" class="agent-btn bg-red-100 text-red-800 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors" data-agent="email">
+                            <i class="fas fa-envelope mr-1"></i>Email
+                        </button>
+                        <button onclick="selectAgent('finance')" class="agent-btn bg-green-100 text-green-800 px-3 py-1 rounded-lg hover:bg-green-200 transition-colors" data-agent="finance">
+                            <i class="fas fa-chart-line mr-1"></i>Finance
+                        </button>
+                        <button onclick="selectAgent('social')" class="agent-btn bg-orange-100 text-orange-800 px-3 py-1 rounded-lg hover:bg-orange-200 transition-colors" data-agent="social">
+                            <i class="fas fa-share-alt mr-1"></i>Social
+                        </button>
+                        <button onclick="selectAgent('customer')" class="agent-btn bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg hover:bg-indigo-200 transition-colors" data-agent="customer">
+                            <i class="fas fa-headset mr-1"></i>Customer
+                        </button>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-600">
+                        <span id="selectedAgentInfo">Selected: General Agent (can help with any task)</span>
+                    </div>
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="h-64 overflow-y-auto border rounded-lg p-4 mb-4 space-y-3 bg-gray-50">
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                        <p class="text-blue-800">👋 Hello! I'm your AI assistant. Select an agent above and start chatting! I can help with:</p>
+                        <ul class="text-sm text-blue-700 mt-2 ml-4">
+                            <li>• Knowledge questions (if you've uploaded documents)</li>
+                            <li>• Email composition and management</li>
+                            <li>• Financial analysis and reports</li>
+                            <li>• Social media content</li>
+                            <li>• Customer service tasks</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="flex space-x-2 mb-4">
+                    <input type="text" id="chatInput" placeholder="Ask me anything..." 
+                           class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="sendMessage()" 
+                            class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-paper-plane mr-2"></i>Send
+                    </button>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="quickChat('What can you help me with?')" 
+                            class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        What can you help with?
+                    </button>
+                    <button onclick="quickChat('Tell me about the knowledge base')" 
+                            class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        Knowledge Base Info
+                    </button>
+                    <button onclick="quickChat('Show me system status')" 
+                            class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                        System Status
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Floating Action Button -->
@@ -375,6 +460,222 @@
         // Check system status on page load
         document.addEventListener('DOMContentLoaded', function() {
             checkSystemStatus();
+        });
+
+        // Chat functionality
+        let selectedAgent = 'general';
+        let chatHistory = [];
+
+        function toggleChat() {
+            const chatInterface = document.getElementById('chatInterface');
+            const toggleBtn = document.getElementById('toggleChatBtn');
+            
+            if (chatInterface.classList.contains('hidden')) {
+                chatInterface.classList.remove('hidden');
+                toggleBtn.innerHTML = '<i class="fas fa-times mr-2"></i>Hide Chat';
+            } else {
+                chatInterface.classList.add('hidden');
+                toggleBtn.innerHTML = '<i class="fas fa-comments mr-2"></i>Toggle Chat';
+            }
+        }
+
+        function clearChat() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = `
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <p class="text-blue-800">👋 Hello! I'm your AI assistant. Select an agent above and start chatting! I can help with:</p>
+                    <ul class="text-sm text-blue-700 mt-2 ml-4">
+                        <li>• Knowledge questions (if you've uploaded documents)</li>
+                        <li>• Email composition and management</li>
+                        <li>• Financial analysis and reports</li>
+                        <li>• Social media content</li>
+                        <li>• Customer service tasks</li>
+                    </ul>
+                </div>
+            `;
+            chatHistory = [];
+        }
+
+        function selectAgent(agent) {
+            selectedAgent = agent;
+            
+            // Update button styles
+            document.querySelectorAll('.agent-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-blue-500');
+            });
+            document.querySelector(`[data-agent="${agent}"]`).classList.add('ring-2', 'ring-blue-500');
+            
+            // Update info text
+            const agentInfo = {
+                'general': 'General Agent (can help with any task)',
+                'knowledge': 'Knowledge Agent (answers from uploaded documents)',
+                'email': 'Email Agent (email composition and management)',
+                'finance': 'Finance Agent (financial analysis and reports)',
+                'social': 'Social Agent (social media content)',
+                'customer': 'Customer Agent (customer service tasks)'
+            };
+            
+            document.getElementById('selectedAgentInfo').textContent = `Selected: ${agentInfo[agent]}`;
+            
+            // Add system message
+            addChatMessage('system', `Switched to ${agentInfo[agent]}`);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            input.value = '';
+            addChatMessage('user', message);
+            
+            // Show typing indicator
+            addChatMessage('system', '🤔 Thinking...');
+            
+            // Route to appropriate agent
+            routeToAgent(message);
+        }
+
+        function quickChat(message) {
+            document.getElementById('chatInput').value = message;
+            sendMessage();
+        }
+
+        async function routeToAgent(message) {
+            try {
+                let response;
+                
+                switch (selectedAgent) {
+                    case 'knowledge':
+                        response = await fetch('/api/knowledge/ask', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ question: message })
+                        });
+                        break;
+                        
+                    case 'email':
+                        response = await fetch('/api/email', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                userId: 'default', 
+                                task: message 
+                            })
+                        });
+                        break;
+                        
+                    case 'finance':
+                        response = await fetch('/api/finance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                userId: 'default', 
+                                task: message 
+                            })
+                        });
+                        break;
+                        
+                    case 'social':
+                        response = await fetch('/api/social', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                userId: 'default', 
+                                task: message 
+                            })
+                        });
+                        break;
+                        
+                    case 'customer':
+                        response = await fetch('/api/customer', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                userId: 'default', 
+                                task: message 
+                            })
+                        });
+                        break;
+                        
+                    default: // general
+                        response = await fetch('/api', {
+                            method: 'GET'
+                        });
+                        break;
+                }
+                
+                const result = await response.json();
+                
+                // Remove typing indicator
+                const messages = document.getElementById('chatMessages');
+                if (messages.lastElementChild && messages.lastElementChild.textContent.includes('🤔 Thinking...')) {
+                    messages.removeChild(messages.lastElementChild);
+                }
+                
+                if (result.success || result.status === 'success') {
+                    let responseText = '';
+                    
+                    if (selectedAgent === 'knowledge') {
+                        responseText = result.answer || 'I found some information for you.';
+                        if (result.sources && result.sources.length > 0) {
+                            responseText += `\n\n📚 Sources: ${result.sources.map(s => s.filename).join(', ')}`;
+                        }
+                    } else if (result.result) {
+                        responseText = result.result;
+                    } else if (result.message) {
+                        responseText = result.message;
+                    } else {
+                        responseText = 'I processed your request successfully.';
+                    }
+                    
+                    addChatMessage('assistant', responseText);
+                } else {
+                    addChatMessage('assistant', `❌ Error: ${result.error || result.message || 'Failed to process request'}`);
+                }
+                
+            } catch (error) {
+                // Remove typing indicator
+                const messages = document.getElementById('chatMessages');
+                if (messages.lastElementChild && messages.lastElementChild.textContent.includes('🤔 Thinking...')) {
+                    messages.removeChild(messages.lastElementChild);
+                }
+                
+                addChatMessage('assistant', `❌ Error: ${error.message}`);
+            }
+        }
+
+        function addChatMessage(type, content) {
+            const messages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            
+            const bgColor = {
+                user: 'bg-blue-100',
+                assistant: 'bg-green-50',
+                system: 'bg-gray-100'
+            }[type] || 'bg-gray-100';
+            
+            messageDiv.className = `p-3 rounded-lg ${bgColor}`;
+            messageDiv.innerHTML = `<p class="text-gray-800">${content}</p>`;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+            
+            // Store in history
+            chatHistory.push({ type, content, timestamp: new Date() });
+        }
+
+        // Enter key support for chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
         });
     </script>
 </body>

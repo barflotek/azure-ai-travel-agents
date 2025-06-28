@@ -311,6 +311,166 @@ app.get('/api/knowledge/documents', (req, res) => {
   });
 });
 
+// Agent endpoints for chat interface
+app.post('/api/email', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    // Simple email agent response
+    const response = `📧 Email Agent: I can help you with "${task}". Here's what I can do:
+    
+• Compose professional emails
+• Draft email templates
+• Manage email campaigns
+• Set up email automation
+• Analyze email performance
+
+Would you like me to help you compose an email or set up email management?`;
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      result: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'email',
+      message: error.message || 'Email agent error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/finance', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    // Simple finance agent response
+    const response = `💰 Finance Agent: I can help you with "${task}". Here's what I can do:
+    
+• Generate financial reports
+• Analyze expenses and revenue
+• Create budgets and forecasts
+• Track financial metrics
+• Provide financial insights
+• Manage invoices and payments
+
+Would you like me to generate a financial report or analyze your data?`;
+    
+    res.json({
+      status: 'success',
+      agent: 'finance',
+      result: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'finance',
+      message: error.message || 'Finance agent error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/social', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    // Simple social agent response
+    const response = `📱 Social Agent: I can help you with "${task}". Here's what I can do:
+    
+• Create engaging social media posts
+• Schedule content across platforms
+• Analyze social media performance
+• Generate hashtag strategies
+• Monitor brand mentions
+• Create social media campaigns
+
+Would you like me to create a social media post or analyze your social performance?`;
+    
+    res.json({
+      status: 'success',
+      agent: 'social',
+      result: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'social',
+      message: error.message || 'Social agent error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/customer', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    // Simple customer agent response
+    const response = `🎧 Customer Agent: I can help you with "${task}". Here's what I can do:
+    
+• Handle customer inquiries
+• Manage support tickets
+• Provide customer service
+• Create FAQ responses
+• Analyze customer feedback
+• Improve customer experience
+
+Would you like me to help with customer support or create a response template?`;
+    
+    res.json({
+      status: 'success',
+      agent: 'customer',
+      result: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'customer',
+      message: error.message || 'Customer agent error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/orchestrator', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    // Simple orchestrator response
+    const response = `🎯 Orchestrator: I can coordinate multiple agents for "${task}". Here's what I can do:
+    
+• Coordinate multiple agents for complex tasks
+• Create automated workflows
+• Manage task dependencies
+• Optimize agent collaboration
+• Monitor multi-agent processes
+• Generate comprehensive reports
+
+Would you like me to coordinate multiple agents for your task?`;
+    
+    res.json({
+      status: 'success',
+      agent: 'orchestrator',
+      result: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'orchestrator',
+      message: error.message || 'Orchestrator error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Serve knowledge dashboard
 app.get('/knowledge', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'knowledge-dashboard.html'));
