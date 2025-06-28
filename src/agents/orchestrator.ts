@@ -101,7 +101,7 @@ export class BusinessAgentOrchestrator {
       
       await SupabaseClient.saveConversation({
         ...orchestrationState,
-        state: { task, status: 'failed', error: error.message }
+        state: { task, status: 'failed', error: error instanceof Error ? error.message : String(error) }
       });
       
       throw error;
@@ -155,8 +155,8 @@ Return ONLY the JSON array, no additional text.
     const response = await this.llmRouter.route(messages, 'complex');
     
     try {
-      const content = response.message?.content || '[]';
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const contentString = String(response.message?.content || '');
+      const jsonMatch = contentString.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const plan = JSON.parse(jsonMatch[0]);
         return this.validateAndEnhancePlan(plan, task);
@@ -166,7 +166,7 @@ Return ONLY the JSON array, no additional text.
       return this.createFallbackPlan(task);
       
     } catch (error) {
-      console.warn('Plan parsing failed, using fallback:', error);
+      console.warn('Plan parsing failed, using fallback:', error instanceof Error ? error.message : String(error));
       return this.createFallbackPlan(task);
     }
   }
@@ -210,7 +210,7 @@ Return ONLY the JSON array, no additional text.
           agentType: step.agentType,
           taskType: step.taskType,
           success: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           completedAt: new Date().toISOString()
         });
         
@@ -289,7 +289,7 @@ Format as a professional business report.
       overallStatus: failedResults.length === 0 ? 'success' : 
                    successfulResults.length > failedResults.length ? 'partial_success' : 'failure',
       agentPerformance: this.analyzeAgentPerformance(results),
-      recommendations: this.extractRecommendations(response.message?.content || ''),
+      recommendations: this.extractRecommendations(String(response.message?.content || '')),
       synthesizedAt: new Date().toISOString()
     };
   }

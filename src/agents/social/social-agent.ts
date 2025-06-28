@@ -163,7 +163,7 @@ Format as JSON array with posts.
       startDate: task.scheduledDate || new Date().toISOString().split('T')[0],
       totalPosts: 7,
       estimatedReach: this.estimateReach(task.platform, task.targetAudience),
-      recommendations: this.extractScheduleRecommendations(response.message?.content || '')
+      recommendations: this.extractScheduleRecommendations(String(response.message?.content || ''))
     };
   }
 
@@ -196,10 +196,10 @@ Include specific metrics and actionable insights.
       platform: task.platform,
       analysisDate: new Date().toISOString(),
       insights: response.message?.content || 'Error analyzing engagement',
-      keyMetrics: this.extractMetrics(response.message?.content || ''),
-      recommendations: this.extractRecommendations(response.message?.content || ''),
+      keyMetrics: this.extractMetrics(String(response.message?.content || '')),
+      recommendations: this.extractRecommendations(String(response.message?.content || '')),
       performanceScore: this.calculatePerformanceScore(task.engagementData),
-      nextActions: this.identifyNextActions(response.message?.content || '')
+      nextActions: this.identifyNextActions(String(response.message?.content || ''))
     };
   }
 
@@ -234,7 +234,7 @@ Provide the response text only.
     return {
       platform: task.platform,
       originalComment: commentToRespond,
-      response: response.message?.content?.trim() || 'Error generating response',
+      response: String(response.message?.content || '').trim() || 'Error generating response',
       tone: task.tone,
       timestamp: new Date().toISOString(),
       sentiment: this.analyzeSentiment(commentToRespond.text),
@@ -314,10 +314,10 @@ Provide competitive intelligence and strategic recommendations.
       competitors: task.competitors,
       industry: task.industry,
       analysis: response.message?.content || 'Error analyzing competitors',
-      opportunities: this.extractOpportunities(response.message?.content || ''),
-      threats: this.extractThreats(response.message?.content || ''),
-      recommendations: this.extractStrategicRecommendations(response.message?.content || ''),
-      competitiveScore: this.calculateCompetitiveScore(response.message?.content || '')
+      opportunities: this.extractOpportunities(String(response.message?.content || '')),
+      threats: this.extractThreats(String(response.message?.content || '')),
+      recommendations: this.extractStrategicRecommendations(String(response.message?.content || '')),
+      competitiveScore: this.calculateCompetitiveScore(String(response.message?.content || ''))
     };
   }
 

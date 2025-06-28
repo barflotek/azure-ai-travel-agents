@@ -1,4 +1,4 @@
-import * as pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 import { SmartLLMRouter } from '../../llm';
 import { LLMMessage } from '../../llm';
 
@@ -51,7 +51,7 @@ export class PDFProcessor {
 
     } catch (error) {
       console.error(`❌ Error processing PDF ${filename}:`, error);
-      throw new Error(`Failed to process PDF: ${error.message}`);
+      throw new Error(`Failed to process PDF: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -162,7 +162,7 @@ Respond in JSON format:
       ];
       
       const response = await this.llmRouter.route(messages, 'medium');
-      const analysis = JSON.parse(response.message?.content || '{}');
+      const analysis = JSON.parse(String(response.message?.content || '{}'));
       
       return {
         primaryIntent: analysis.primaryIntent || 'general',

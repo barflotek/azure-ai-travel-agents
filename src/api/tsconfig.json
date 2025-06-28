@@ -10,9 +10,21 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/**/*",
+    "../agents/**/*",
+    "../llm/**/*",
+    "../database/**/*",
+    "../integrations/**/*",
+    "../routes/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "../ui/**/*",
+    "../tools/**/*",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
 }

@@ -81,7 +81,7 @@ export class CustomerAgent {
       
       await SupabaseClient.saveConversation({
         ...conversation,
-        state: { task, status: 'failed', error: error.message }
+        state: { task, status: 'failed', error: error instanceof Error ? error.message : String(error) }
       });
       
       throw error;
@@ -135,7 +135,7 @@ Response should be complete and ready to send.
       response: response.message?.content || 'Error generating response',
       sentiment: this.analyzeSentiment(customerMessage.content),
       urgency: this.assessUrgency(customerMessage.content),
-      suggestedActions: this.extractSuggestedActions(response.message?.content || ''),
+      suggestedActions: this.extractSuggestedActions(String(response.message?.content || '')),
       estimatedResolutionTime: this.estimateResolutionTime(customerMessage.content),
       followUpRequired: this.requiresFollowUp(customerMessage.content),
       timestamp: new Date().toISOString()
@@ -234,7 +234,7 @@ Format as a professional escalation brief.
       assignedTo: this.getEscalationAssignee(escalationReason || ''),
       slaDeadline: this.calculateEscalationSLA(),
       stakeholderNotifications: this.getStakeholderList(escalationReason || ''),
-      resolutionPlan: this.createResolutionPlan(response.message?.content || ''),
+      resolutionPlan: this.createResolutionPlan(String(response.message?.content || '')),
       timestamp: new Date().toISOString()
     };
   }
@@ -307,9 +307,9 @@ Generate insights for continuous improvement.
       satisfactionScore: this.extractSatisfactionScore(task.satisfactionData),
       analysis: response.message?.content || 'Error analyzing satisfaction data',
       sentimentTrend: this.analyzeSatisfactionTrend(task.satisfactionData),
-      improvementActions: this.extractImprovementActions(response.message?.content || ''),
+      improvementActions: this.extractImprovementActions(String(response.message?.content || '')),
       customerRetentionRisk: this.assessRetentionRisk(task.satisfactionData),
-      teamFeedback: this.generateTeamFeedback(response.message?.content || ''),
+      teamFeedback: this.generateTeamFeedback(String(response.message?.content || '')),
       timestamp: new Date().toISOString()
     };
   }
@@ -342,10 +342,10 @@ Format as structured knowledge base results.
     return {
       query: task.knowledgeQuery,
       searchResults: this.parseKnowledgeResults(response),
-      relevanceScore: this.calculateRelevanceScore(task.knowledgeQuery || '', response.message?.content || ''),
-      suggestedArticles: this.extractArticleSuggestions(response.message?.content || ''),
+      relevanceScore: this.calculateRelevanceScore(task.knowledgeQuery || '', String(response.message?.content || '')),
+      suggestedArticles: this.extractArticleSuggestions(String(response.message?.content || '')),
       relatedQueries: this.generateRelatedQueries(task.knowledgeQuery || ''),
-      contentGaps: this.identifyContentGaps(task.knowledgeQuery || '', response.message?.content || ''),
+      contentGaps: this.identifyContentGaps(task.knowledgeQuery || '', String(response.message?.content || '')),
       timestamp: new Date().toISOString()
     };
   }

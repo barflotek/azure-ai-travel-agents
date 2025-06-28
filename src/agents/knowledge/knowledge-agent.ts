@@ -81,7 +81,7 @@ export class KnowledgeAgent {
       
       await SupabaseClient.saveConversation({
         ...conversation,
-        state: { task, status: 'failed', error: error.message }
+        state: { task, status: 'failed', error: error instanceof Error ? error.message : String(error) }
       });
       
       throw error;

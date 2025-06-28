@@ -445,6 +445,22 @@ Provide analysis in this JSON format:
 
     const emails = await this.gmailClient.getRecentEmails(100);
     
+    const categories: { [key: string]: number } = {};
+    const senders: { [key: string]: number } = {};
+    const hours: { [key: number]: number } = {};
+    const days: { [key: string]: number } = {};
+
+    emails.forEach(email => {
+      const category = this.categorizeEmail(email);
+      categories[category] = (categories[category] || 0) + 1;
+      const domain = email.from.split('@')[1] || 'unknown';
+      senders[domain] = (senders[domain] || 0) + 1;
+      const hour = email.date.getHours();
+      hours[hour] = (hours[hour] || 0) + 1;
+      const day = email.date.toLocaleDateString('en-US', { weekday: 'long' });
+      days[day] = (days[day] || 0) + 1;
+    });
+
     return {
       totalEmails: emails.length,
       unreadCount: emails.filter(e => !e.isRead).length,
@@ -459,17 +475,23 @@ Provide analysis in this JSON format:
       },
       
       // Category distribution
-      categoryBreakdown: this.getCategoryBreakdown(emails),
+      categoryBreakdown: categories,
       
       // Response time analytics
       averageResponseTime: this.calculateAverageResponseTime(emails),
       
       // Sender analytics
-      topSenders: this.getTopSenders(emails),
+      topSenders: Object.entries(senders)
+        .map(([domain, count]) => ({ domain, count }))
+        .sort((a, b) => (b.count as number) - (a.count as number))
+        .slice(0, 10),
       
       // Time analytics
-      emailsByHour: this.getEmailsByHour(emails),
-      emailsByDay: this.getEmailsByDay(emails)
+      emailsByHour: Object.entries(hours)
+        .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+        .sort((a, b) => a.hour - b.hour),
+      emailsByDay: Object.entries(days)
+        .map(([day, count]) => ({ day, count }))
     };
   }
 
@@ -661,55 +683,10 @@ ${task.content}
     return 'personal';
   }
 
-  private getCategoryBreakdown(emails: GmailMessage[]): any {
-    const categories = {};
-    emails.forEach(email => {
-      const category = this.categorizeEmail(email);
-      categories[category] = (categories[category] || 0) + 1;
-    });
-    return categories;
-  }
-
   private calculateAverageResponseTime(emails: GmailMessage[]): number {
     // This would require tracking response times in a database
     // For now, return a placeholder
     return 24; // hours
-  }
-
-  private getTopSenders(emails: GmailMessage[]): any[] {
-    const senders = {};
-    emails.forEach(email => {
-      const domain = email.from.split('@')[1] || 'unknown';
-      senders[domain] = (senders[domain] || 0) + 1;
-    });
-    
-    return Object.entries(senders)
-      .map(([domain, count]) => ({ domain, count }))
-      .sort((a, b) => (b.count as number) - (a.count as number))
-      .slice(0, 10);
-  }
-
-  private getEmailsByHour(emails: GmailMessage[]): any[] {
-    const hours = {};
-    emails.forEach(email => {
-      const hour = email.date.getHours();
-      hours[hour] = (hours[hour] || 0) + 1;
-    });
-    
-    return Object.entries(hours)
-      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-      .sort((a, b) => a.hour - b.hour);
-  }
-
-  private getEmailsByDay(emails: GmailMessage[]): any[] {
-    const days = {};
-    emails.forEach(email => {
-      const day = email.date.toLocaleDateString('en-US', { weekday: 'long' });
-      days[day] = (days[day] || 0) + 1;
-    });
-    
-    return Object.entries(days)
-      .map(([day, count]) => ({ day, count }));
   }
 
   private isToday(date: Date): boolean {

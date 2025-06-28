@@ -34,7 +34,7 @@ export class GmailClient {
       console.log(`📧 Found ${messages.length} messages, fetching details...`);
 
       // Use batch processing for better performance
-      const emails = await this.getEmailsBatch(messages.map(msg => msg.id));
+      const emails = await this.getEmailsBatch(messages.map((msg: any) => msg.id));
       
       console.log(`✅ Successfully loaded ${emails.length} emails`);
       return emails;
@@ -57,7 +57,7 @@ export class GmailClient {
       const messages = response.data.messages || [];
       console.log(`📧 Found ${messages.length} unread messages, fetching details...`);
 
-      const emails = await this.getEmailsBatch(messages.map(msg => msg.id));
+      const emails = await this.getEmailsBatch(messages.map((msg: any) => msg.id));
       
       console.log(`✅ Successfully loaded ${emails.length} unread emails`);
       return emails;
@@ -121,7 +121,7 @@ export class GmailClient {
       console.log(`📧 Found ${messages.length} messages, processing...`);
 
       // Fetch full message details to get headers and body
-      const emailPromises = messages.map(async (msg) => {
+      const emailPromises = messages.map(async (msg: any) => {
         try {
           const messageResponse = await this.gmail.users.messages.get({
             userId: 'me',
@@ -221,7 +221,7 @@ export class GmailClient {
       console.error('Error sending email:', error);
       return {
         success: false,
-        message: `Failed to send email to ${to}: ${error.message}`,
+        message: `Failed to send email to ${to}: ${error instanceof Error ? error.message : String(error)}`,
         details: {
           to,
           subject,
@@ -317,7 +317,7 @@ export class GmailClient {
       });
 
       const messages = response.data.messages || [];
-      const emailPromises = messages.map(msg => this.getEmailDetails(msg.id));
+      const emailPromises = messages.map((msg: any) => this.getEmailDetails(msg.id));
       return await Promise.all(emailPromises);
     } catch (error) {
       console.error('Error searching emails:', error);

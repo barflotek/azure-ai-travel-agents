@@ -48,7 +48,7 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
     console.error('Upload error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -79,7 +79,7 @@ router.post('/ask', async (req, res) => {
     console.error('Question error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -109,7 +109,7 @@ router.post('/search', async (req, res) => {
     console.error('Search error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -140,7 +140,7 @@ router.post('/advice', async (req, res) => {
     console.error('Advice error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -170,7 +170,7 @@ router.post('/summarize', async (req, res) => {
     console.error('Summarize error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -196,7 +196,7 @@ router.get('/status/:userId?', async (req, res) => {
     console.error('Status error:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });

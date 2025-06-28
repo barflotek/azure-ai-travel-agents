@@ -146,7 +146,7 @@ Format as a structured business report.
       period: task.period,
       generatedAt: new Date().toISOString(),
       content: response.message?.content || 'Error generating report',
-      summary: this.extractSummary(response.message?.content || '')
+      summary: this.extractSummary(String(response.message?.content || ''))
     };
   }
 
@@ -182,8 +182,9 @@ Provide a brief analysis with actionable insights.
         date: task.date
       },
       analysis: response.message?.content || 'Error analyzing transaction',
-      riskLevel: this.assessRiskLevel(response.message?.content || ''),
-      recommendations: this.extractRecommendations(response.message?.content || '')
+      riskLevel: this.assessRiskLevel(String(response.message?.content || '')),
+      recommendations: this.extractRecommendations(String(response.message?.content || '')),
+      keyAssumptions: this.extractAssumptions(String(response.message?.content || ''))
     };
   }
 
@@ -216,7 +217,7 @@ Format as a professional budget forecast with numbers and percentages.
       generatedAt: new Date().toISOString(),
       forecast: response.message?.content || 'Error generating forecast',
       confidence: 'medium', // TODO: Add confidence scoring
-      keyAssumptions: this.extractAssumptions(response.message?.content || '')
+      keyAssumptions: this.extractAssumptions(String(response.message?.content || ''))
     };
   }
 
@@ -276,7 +277,7 @@ Format as ready-to-send invoice content.
       }
       return { content, parsed: false };
     } catch (error) {
-      return { content: response.message?.content || '', parsed: false, error: error.message };
+      return { content: response.message?.content || '', parsed: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
