@@ -28,7 +28,20 @@ export class SmartLLMRouter {
         return await this.groq.chat(messages);
       } catch (error: any) {
         if (error.message?.includes('Rate limit')) {
-          throw new Error(`Groq rate limit: ${error.message}. Try using Ollama instead or wait for the cooldown.`);
+          // Try Ollama as emergency fallback
+          try {
+            console.log('🚨 Groq rate limited, trying Ollama as emergency fallback...');
+            const isAvailable = await this.ollama.isAvailable();
+            if (isAvailable) {
+              const result = await this.ollama.chat(messages);
+              console.log('✅ Ollama emergency fallback succeeded');
+              return result;
+            }
+          } catch (ollamaError) {
+            console.log('❌ Ollama emergency fallback also failed:', ollamaError);
+          }
+          
+          throw new Error(`Groq is rate limited: ${error.message}. Please wait or enable local Ollama for immediate responses.`);
         }
         throw error;
       }
@@ -74,7 +87,11 @@ export class SmartLLMRouter {
           console.log('❌ Ollama emergency fallback also failed:', ollamaError);
         }
         
-        throw new Error(`All LLM providers are unavailable. Groq is rate limited: ${error.message}. Please wait or enable local Ollama.`);
+        // Get rate limit details for better error message
+        const rateLimitStatus = this.groq.getRateLimitStatus();
+        const waitTime = rateLimitStatus.remainingSeconds;
+        
+        throw new Error(`All LLM providers are unavailable. Groq is rate limited: Please wait ${waitTime} seconds before trying again. Consider using local Ollama for immediate responses.`);
       }
       throw error;
     }

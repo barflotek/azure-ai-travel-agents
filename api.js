@@ -986,7 +986,12 @@ app.get('/api/tts/usage', (req, res) => {
 // LLM Provider Status endpoint
 app.get('/api/llm/status', async (req, res) => {
   try {
-    const status = await conversationalAgent.getLLMStatus();
+    // Import the SmartLLMRouter to check provider status
+    const { SmartLLMRouter } = await import('./src/llm/routing/smart-router.ts');
+    const router = new SmartLLMRouter();
+    
+    const status = await router.getProviderStatus();
+    
     res.json({
       success: true,
       status,
@@ -1000,6 +1005,47 @@ app.get('/api/llm/status', async (req, res) => {
       message: 'Failed to get LLM provider status'
     });
   }
+});
+
+// LLM Provider Setup Guide endpoint
+app.get('/api/llm/setup', (req, res) => {
+  res.json({
+    success: true,
+    setup: {
+      ollama: {
+        enabled: process.env.LOCAL_LLM_ENABLED === 'true',
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+        instructions: [
+          '1. Install Ollama from https://ollama.ai',
+          '2. Run: ollama pull llama3.1:8b',
+          '3. Start Ollama: ollama serve',
+          '4. Set LOCAL_LLM_ENABLED=true in your environment'
+        ],
+        model: 'llama3.1:8b',
+        benefits: [
+          'No rate limits',
+          'No API costs',
+          'Faster responses',
+          'Works offline'
+        ]
+      },
+      groq: {
+        enabled: !!process.env.GROQ_API_KEY,
+        rateLimit: '180 requests per minute',
+        cooldown: '3 minutes after rate limit',
+        benefits: [
+          'High performance',
+          'Latest models',
+          'Reliable service'
+        ]
+      }
+    },
+    recommendations: [
+      'Enable local Ollama for immediate responses',
+      'Use Groq as fallback for complex queries',
+      'Monitor rate limits and switch providers accordingly'
+    ]
+  });
 });
 
 // 404 handler
@@ -1039,7 +1085,8 @@ app.use('*', (req, res) => {
       'GET /api/config',
       'POST /api/tts/elevenlabs',
       'GET /api/tts/usage',
-      'GET /api/llm/status'
+      'GET /api/llm/status',
+      'GET /api/llm/setup'
     ],
     timestamp: new Date().toISOString()
   });
