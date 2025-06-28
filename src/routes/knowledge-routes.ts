@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import path from 'path';
 import { KnowledgeAgent } from '../agents/knowledge';
 
 const router = express.Router();
@@ -17,6 +18,11 @@ function getOrCreateAgent(userId: string = 'default'): KnowledgeAgent {
   }
   return knowledgeAgents.get(userId)!;
 }
+
+// Serve knowledge dashboard
+router.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../public/knowledge-dashboard.html'));
+});
 
 // Upload PDF document
 router.post('/upload', upload.single('pdf'), async (req, res) => {

@@ -18,8 +18,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Knowledge routes (imported dynamically to avoid path issues)
-const knowledgeRoutes = require('../../routes/knowledge-routes').default;
+// Knowledge routes
+const knowledgeRoutes = require('../../routes/knowledge-routes');
 app.use('/api/knowledge', knowledgeRoutes);
 
 // Health check endpoint
