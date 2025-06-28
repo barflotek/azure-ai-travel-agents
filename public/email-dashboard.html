@@ -11,22 +11,34 @@
         /* Dark mode support */
         :root {
             --bg-primary: #ffffff;
-            --bg-secondary: #f9fafb;
-            --bg-card: #ffffff;
-            --text-primary: #111827;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
             --text-secondary: #6b7280;
-            --border-color: #e5e7eb;
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --text-tertiary: #94a3b8;
+            --border-primary: #e2e8f0;
+            --border-secondary: #cbd5e1;
+            --accent-primary: #3b82f6;
+            --accent-secondary: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
         }
         
         [data-theme="dark"] {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
-            --bg-card: #334155;
+            --bg-tertiary: #334155;
             --text-primary: #f8fafc;
             --text-secondary: #cbd5e1;
-            --border-color: #475569;
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            --text-tertiary: #94a3b8;
+            --border-primary: #334155;
+            --border-secondary: #475569;
+            --accent-primary: #60a5fa;
+            --accent-secondary: #3b82f6;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
         }
         
         body {
@@ -36,15 +48,15 @@
         }
         
         .card {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-primary);
             box-shadow: var(--shadow);
             color: var(--text-primary);
         }
         
         .email-card:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
         }
         
         .priority-high { border-left: 4px solid #ef4444; }
@@ -142,6 +154,55 @@
         .theme-toggle:hover {
             transform: scale(1.1);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Email-specific dark mode improvements */
+        .email-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+        }
+
+        .email-card:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
+        }
+
+        /* Email modal improvements */
+        .email-modal-content {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .email-body {
+            color: var(--text-primary) !important;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* Ensure email preview text is visible */
+        .email-preview {
+            color: var(--text-secondary) !important;
+        }
+
+        /* Dark mode specific overrides */
+        [data-theme="dark"] .email-body {
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] .email-preview {
+            color: #cbd5e1 !important;
+        }
+
+        /* Modal backdrop improvements */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Smooth transitions */
+        * {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
         }
     </style>
 </head>
@@ -1044,9 +1105,9 @@
                             }">${email.priority || 'medium'}</span>
                             <span class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">${email.category || 'personal'}</span>
                         </div>
-                        <h3 class="font-semibold mb-1">${email.subject}</h3>
-                        <p class="text-sm text-secondary mb-2">${email.preview || email.body.substring(0, 100)}...</p>
-                        <div class="flex items-center justify-between text-xs text-secondary">
+                        <h3 class="font-semibold mb-1 text-gray-900 dark:text-white">${email.subject}</h3>
+                        <p class="text-sm email-preview mb-2">${email.preview || email.body.substring(0, 100)}...</p>
+                        <div class="flex items-center justify-between text-xs email-preview">
                             <span>${new Date(email.date).toLocaleDateString()}</span>
                             ${!email.isRead ? '<span class="bg-blue-500 text-white px-2 py-1 rounded-full">Unread</span>' : ''}
                         </div>
@@ -1294,29 +1355,29 @@
 
             const modalContent = document.getElementById('emailModalContent');
             modalContent.innerHTML = `
-                <div class="space-y-4">
-                    <div class="border-b pb-4">
+                <div class="space-y-4 email-modal-content">
+                    <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
                         <div class="flex items-center space-x-2 mb-2">
-                            <span class="font-medium">From:</span>
-                            <span>${email.from}</span>
+                            <span class="font-medium text-gray-900 dark:text-white">From:</span>
+                            <span class="text-gray-700 dark:text-gray-300">${email.from}</span>
                         </div>
                         <div class="flex items-center space-x-2 mb-2">
-                            <span class="font-medium">Subject:</span>
-                            <span>${email.subject}</span>
+                            <span class="font-medium text-gray-900 dark:text-white">Subject:</span>
+                            <span class="text-gray-700 dark:text-gray-300">${email.subject}</span>
                         </div>
                         <div class="flex items-center space-x-2 mb-2">
-                            <span class="font-medium">Date:</span>
-                            <span>${new Date(email.date).toLocaleString()}</span>
+                            <span class="font-medium text-gray-900 dark:text-white">Date:</span>
+                            <span class="text-gray-700 dark:text-gray-300">${new Date(email.date).toLocaleString()}</span>
                         </div>
                     </div>
-                    <div class="prose max-w-none">
-                        <p class="whitespace-pre-wrap">${email.body}</p>
+                    <div class="prose max-w-none dark:prose-invert">
+                        <div class="email-body whitespace-pre-wrap leading-relaxed">${email.body}</div>
                     </div>
-                    <div class="flex justify-end space-x-3 pt-4 border-t">
-                        <button onclick="generateAIReply('${email.id}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button onclick="generateAIReply('${email.id}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
                             <i class="fas fa-reply mr-2"></i>Generate Reply
                         </button>
-                        <button onclick="markAsRead('${email.id}')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <button onclick="markAsRead('${email.id}')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
                             <i class="fas fa-check mr-2"></i>Mark Read
                         </button>
                     </div>
