@@ -8,14 +8,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Dark mode support */
         :root {
             --bg-primary: #ffffff;
             --bg-secondary: #f8fafc;
             --bg-tertiary: #f1f5f9;
-            --text-primary: #1e293b;
-            --text-secondary: #6b7280;
-            --text-tertiary: #94a3b8;
+            --text-primary: #000000;
+            --text-secondary: #374151;
+            --text-tertiary: #6b7280;
             --border-primary: #e2e8f0;
             --border-secondary: #cbd5e1;
             --accent-primary: #3b82f6;
@@ -24,136 +23,84 @@
             --warning: #f59e0b;
             --error: #ef4444;
         }
-        
-        [data-theme="dark"] {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-tertiary: #94a3b8;
-            --border-primary: #334155;
-            --border-secondary: #475569;
-            --accent-primary: #60a5fa;
-            --accent-secondary: #3b82f6;
-            --success: #34d399;
-            --warning: #fbbf24;
-            --error: #f87171;
-        }
-        
+
+        /* Force light theme - remove all dark mode */
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            transition: all 0.3s ease;
+            background-color: #ffffff !important;
+            color: #000000 !important;
         }
-        
+
+        /* Force all text to be black */
+        * {
+            color: #000000 !important;
+        }
+
+        /* Email specific - force black text */
+        .email-body,
+        .email-preview,
+        .prose,
+        .prose *,
+        .email-modal-content,
+        .email-modal-content *,
+        #emailModalContent,
+        #emailModalContent * {
+            color: #000000 !important;
+        }
+
+        /* Force white backgrounds */
+        .email-card,
+        .email-modal,
+        .modal-content {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+
+        /* Force black text on all elements */
+        p, div, span, h1, h2, h3, h4, h5, h6 {
+            color: #000000 !important;
+        }
+
+        /* Remove all dark mode styles */
+        [data-theme="dark"],
+        html.dark,
+        .dark {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+
+        [data-theme="dark"] *,
+        html.dark *,
+        .dark * {
+            color: #000000 !important;
+        }
+
+        /* Basic styling */
         .card {
             background-color: var(--bg-primary);
             border: 1px solid var(--border-primary);
-            box-shadow: var(--shadow);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             color: var(--text-primary);
         }
-        
+
         .email-card:hover { 
             background: var(--bg-secondary);
             border-color: var(--accent-primary);
         }
-        
-        .priority-high { border-left: 4px solid #ef4444; }
-        .priority-medium { border-left: 4px solid #f59e0b; }
-        .priority-low { border-left: 4px solid #10b981; }
-        
-        /* Enhanced category colors with better contrast */
-        .category-work { 
-            background-color: #dbeafe; 
-            color: #1e40af;
+
+        /* Modal styling */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
         }
-        .category-personal { 
-            background-color: #fef3c7; 
-            color: #92400e;
-        }
-        .category-newsletter { 
-            background-color: #f3e8ff; 
-            color: #7c3aed;
-        }
-        .category-promotional { 
-            background-color: #fecaca; 
-            color: #dc2626;
-        }
-        .category-urgent { 
-            background-color: #fee2e2; 
-            color: #dc2626;
-        }
-        .category-meeting { 
-            background-color: #dcfce7; 
-            color: #166534;
-        }
-        
-        /* Dark mode category overrides */
-        [data-theme="dark"] .category-work { 
-            background-color: #1e3a8a; 
-            color: #93c5fd;
-        }
-        [data-theme="dark"] .category-personal { 
-            background-color: #92400e; 
-            color: #fef3c7;
-        }
-        [data-theme="dark"] .category-newsletter { 
-            background-color: #7c3aed; 
-            color: #e9d5ff;
-        }
-        [data-theme="dark"] .category-promotional { 
-            background-color: #dc2626; 
-            color: #fecaca;
-        }
-        [data-theme="dark"] .category-urgent { 
-            background-color: #dc2626; 
-            color: #fee2e2;
-        }
-        [data-theme="dark"] .category-meeting { 
-            background-color: #166534; 
-            color: #dcfce7;
-        }
-        
-        /* Performance optimizations */
-        .email-card { 
-            will-change: transform;
-            contain: layout style paint;
-        }
-        .email-list-container {
-            contain: layout style;
-            height: 600px;
-            overflow-y: auto;
-        }
-        .email-item {
-            contain: layout style paint;
-        }
-        * { 
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
-        
-        /* Theme toggle button */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            color: white;
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .theme-toggle:hover {
-            transform: scale(1.1);
+
+        .modal-content {
+            background-color: #ffffff !important;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Smooth transitions */
+        * {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
         }
 
         /* Email-specific dark mode improvements */
@@ -194,17 +141,6 @@
         .dark .email-preview,
         [data-theme="dark"] .email-preview {
             color: #cbd5e1 !important;
-        }
-
-        /* Modal backdrop improvements */
-        .modal-backdrop {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-        }
-
-        /* Smooth transitions */
-        * {
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
         }
 
         /* Additional dark mode fixes */
@@ -319,9 +255,7 @@
 </head>
 <body class="min-h-screen">
     <!-- Theme Toggle Button -->
-    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
-        <i class="fas fa-moon" id="themeIcon"></i>
-    </button>
+    <!-- REMOVED: Forcing light theme only -->
 
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
@@ -1587,29 +1521,11 @@
 
             document.getElementById('emailModal').classList.remove('hidden');
             
-            // Force apply dark mode styles after modal opens
-            setTimeout(() => {
-                forceDarkModeStyles();
-            }, 100);
+            // Force light theme - no dark mode needed
         }
 
         // Force apply dark mode styles to email modal
-        function forceDarkModeStyles() {
-            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-            if (isDarkMode) {
-                const modalContent = document.getElementById('emailModalContent');
-                if (modalContent) {
-                    // Force white text on all elements
-                    const allElements = modalContent.querySelectorAll('*');
-                    allElements.forEach(element => {
-                        element.style.color = '#f8fafc';
-                    });
-                    
-                    // Force white text on the modal content itself
-                    modalContent.style.color = '#f8fafc';
-                }
-            }
-        }
+        // REMOVED: No longer needed - forcing light theme only
 
         function closeEmailModal() {
             document.getElementById('emailModal').classList.add('hidden');
@@ -2052,57 +1968,27 @@
             }
         }
         
-        // Theme toggle functionality
+        // Theme toggle functionality - FORCED LIGHT THEME
         function toggleTheme() {
-            const body = document.body;
-            const themeIcon = document.getElementById('themeIcon');
-            const currentTheme = body.getAttribute('data-theme');
-            
-            if (currentTheme === 'dark') {
-                body.removeAttribute('data-theme');
-                themeIcon.className = 'fas fa-moon';
-                localStorage.setItem('theme', 'light');
-            } else {
-                body.setAttribute('data-theme', 'dark');
-                themeIcon.className = 'fas fa-sun';
-                localStorage.setItem('theme', 'dark');
-            }
+            // Force light theme only
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
         }
         
-        // Initialize theme on page load
+        // Initialize theme on page load - FORCED LIGHT THEME
         function initializeTheme() {
-            const savedTheme = localStorage.getItem('theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const themeIcon = document.getElementById('themeIcon');
-            
-            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-                document.body.setAttribute('data-theme', 'dark');
-                themeIcon.className = 'fas fa-sun';
-            } else {
-                themeIcon.className = 'fas fa-moon';
-            }
+            // Force light theme
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
         }
         
         // Initialize theme when page loads
         document.addEventListener('DOMContentLoaded', initializeTheme);
         
-        // Additional theme enforcement
-        function enforceDarkMode() {
-            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
-            console.log('Current theme:', isDarkMode ? 'dark' : 'light');
-            
-            if (isDarkMode) {
-                // Force dark mode styles on all email-related elements
-                const emailElements = document.querySelectorAll('.email-body, .email-preview, .prose, .email-modal-content');
-                emailElements.forEach(element => {
-                    element.style.color = '#f8fafc';
-                });
-            }
-        }
-        
-        // Run theme enforcement after page loads
+        // Force light theme on load
         window.addEventListener('load', () => {
-            setTimeout(enforceDarkMode, 500);
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
         });
     </script>
 </body>
