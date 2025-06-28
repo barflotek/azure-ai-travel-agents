@@ -3,1076 +3,378 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Agent System</title>
+    <title>Business Agent System - Directory</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .voice-pulse {
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-        }
-        .voice-wave {
-            animation: wave 2s infinite;
-        }
-        @keyframes wave {
-            0%, 100% { transform: scaleY(1); }
-            50% { transform: scaleY(1.5); }
-        }
-        .thinking-dots {
-            animation: thinking 1.5s infinite;
-        }
-        @keyframes thinking {
-            0%, 20% { opacity: 0; }
-            50% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-        .conversation-mode {
+        .agent-card {
+            transition: all 0.3s ease;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .voice-controls {
-            transition: all 0.3s ease;
+        .agent-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         }
-        .voice-controls:hover {
-            transform: translateY(-2px);
+        .email-card { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); }
+        .finance-card { background: linear-gradient(135deg, #2ed573 0%, #1e90ff 100%); }
+        .social-card { background: linear-gradient(135deg, #ffa502 0%, #ff6348 100%); }
+        .customer-card { background: linear-gradient(135deg, #3742fa 0%, #2f3542 100%); }
+        .knowledge-card { background: linear-gradient(135deg, #a55eea 0%, #fd79a8 100%); }
+        .orchestrator-card { background: linear-gradient(135deg, #00d2d3 0%, #54a0ff 100%); }
+        .gmail-card { background: linear-gradient(135deg, #ff9ff3 0%, #f368e0 100%); }
+        .dashboard-card { background: linear-gradient(135deg, #48dbfb 0%, #0abde3 100%); }
+        
+        .floating-action {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-glow {
+            from { box-shadow: 0 0 20px rgba(102, 126, 234, 0.4); }
+            to { box-shadow: 0 0 30px rgba(102, 126, 234, 0.8); }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto p-8">
-        <h1 class="text-4xl font-bold text-center mb-8 text-blue-600">
-            🤖 Business Agent System
-        </h1>
-        
-        <!-- Knowledge Dashboard Button -->
-        <div class="text-center mb-8">
-            <a href="/api/knowledge/dashboard" 
-               class="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-lg rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-                📚 Business Knowledge Agent
-                <svg class="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                </svg>
-            </a>
-            <p class="text-gray-600 mt-2 text-sm">Transform PDF business books into an intelligent AI advisor</p>
-        </div>
-        
-        <!-- Gmail Integration Section -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-            <h2 class="text-2xl font-semibold mb-4 text-yellow-800">📧 Gmail Integration</h2>
-            <p class="text-yellow-700 mb-4">Connect your Gmail to read and send real emails with voice commands!</p>
-            
-            <div class="flex flex-wrap items-center gap-4">
-                <button id="connectGmailBtn" onclick="connectGmail()" 
-                        class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-all">
-                    🔗 Connect Gmail
-                </button>
-                
-                <div id="gmailStatus" class="text-sm">
-                    <span class="text-gray-600">Status: Not connected</span>
-                </div>
-                
-                <div id="gmailActions" class="hidden space-x-2">
-                    <button onclick="checkRealEmails()" 
-                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                        📬 Check Emails
-                    </button>
-                    <button onclick="showSendEmailForm()" 
-                            class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
-                        ✉️ Send Email
-                    </button>
-                    <button onclick="disconnectGmail()" 
-                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                        🔌 Disconnect
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Gmail Results -->
-            <div id="gmailResults" class="mt-4 hidden">
-                <div id="emailList" class="space-y-2"></div>
-            </div>
-        </div>
-        
-        <!-- Main Chat Interface -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h2 class="text-2xl font-semibold mb-4">💬 Main Chat Assistant</h2>
-            
-            <!-- Enhanced Voice Controls -->
-            <div class="voice-controls mb-6 text-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-                <button id="voiceToggle" class="bg-green-500 text-white px-8 py-4 rounded-full text-lg hover:bg-green-600 transition-all shadow-lg hover:shadow-xl">
-                    🎤 Start Voice Chat
-                </button>
-                
-                <div id="voiceStatus" class="mt-3 text-lg font-medium text-gray-700"></div>
-                
-                <!-- Voice Quality Controls -->
-                <div class="mt-4 flex flex-wrap justify-center items-center gap-4 text-sm">
-                    <div class="flex items-center space-x-2">
-                        <label>Voice Speed:</label>
-                        <input type="range" id="voiceSpeed" min="0.5" max="2" step="0.1" value="1" class="w-20">
-                        <span id="speedValue">1x</span>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b border-gray-200">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-robot text-white text-xl"></i>
                     </div>
-                    
-                    <div class="flex items-center space-x-2">
-                        <label>Voice Pitch:</label>
-                        <input type="range" id="voicePitch" min="0.5" max="2" step="0.1" value="1" class="w-20">
-                        <span id="pitchValue">1x</span>
-                    </div>
-                    
-                    <div class="flex items-center space-x-2">
-                        <label>Voice Quality:</label>
-                        <select id="voiceQuality" class="border rounded px-2 py-1">
-                            <option value="browser">Browser TTS</option>
-                            <option value="premium">Premium (ElevenLabs)</option>
-                        </select>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Business Agent System</h1>
+                        <p class="text-gray-600 text-sm">AI-Powered Business Automation</p>
                     </div>
                 </div>
-                
-                <!-- Conversation Mode Toggle -->
-                <div class="mt-3">
-                    <label class="flex items-center justify-center space-x-2">
-                        <input type="checkbox" id="conversationMode" checked>
-                        <span class="text-sm font-medium">Continuous Conversation Mode</span>
-                    </label>
-                </div>
-            </div>
-            
-            <div class="flex flex-col h-96">
-                <!-- Chat Messages -->
-                <div id="chatMessages" class="flex-1 overflow-y-auto p-4 bg-gray-50 rounded mb-4 space-y-4">
-                    <div class="text-center text-gray-500">
-                        Start a conversation with your AI assistant...
-                    </div>
-                </div>
-                
-                <!-- Chat Input (Hidden in voice mode) -->
-                <div id="textInputSection" class="flex space-x-2">
-                    <input type="text" id="chatInput" placeholder="Type your message here..." 
-                           class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           onkeypress="if(event.key === 'Enter') sendChatMessage()">
-                    
-                    <button onclick="sendChatMessage()" 
-                            class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        Send
+                <div class="flex items-center space-x-4">
+                    <button onclick="checkSystemStatus()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-heartbeat mr-2"></i>System Status
                     </button>
-                    <button onclick="clearChat()" 
-                            class="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                        Clear
-                    </button>
+                    <div id="statusIndicator" class="w-3 h-3 bg-green-400 rounded-full pulse-glow"></div>
                 </div>
             </div>
         </div>
-        
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h2 class="text-2xl font-semibold mb-4">System Status</h2>
-            <div id="status" class="text-gray-600">Loading...</div>
-            <button onclick="checkStatus()" class="bg-blue-500 text-white px-4 py-2 rounded mt-4 hover:bg-blue-600">
-                Refresh Status
-            </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Welcome Section -->
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Your AI Business Hub</h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Choose from our specialized AI agents to automate your business tasks. 
+                Each agent is designed to handle specific business functions with intelligence and efficiency.
+            </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Knowledge Dashboard CTA -->
+        <div class="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-xl p-8 mb-12 text-white text-center shadow-2xl">
+            <div class="max-w-2xl mx-auto">
+                <h3 class="text-3xl font-bold mb-4">🚀 Try Our New Knowledge Dashboard!</h3>
+                <p class="text-lg mb-6 opacity-90">
+                    Upload business documents and get intelligent AI-powered insights and advice. 
+                    Transform your PDFs into a smart business advisor.
+                </p>
+                <button onclick="navigateToKnowledgeDashboard()" class="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-bold hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-brain mr-2"></i>
+                    Launch Knowledge Dashboard
+                </button>
+            </div>
+        </div>
+
+        <!-- Agent Directory Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+            
             <!-- Email Agent -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-semibold mb-4 text-green-600">📧 Email Agent</h3>
-                <div class="space-y-4">
-                    <input type="email" id="emailRecipient" placeholder="Recipient email" 
-                           class="w-full p-2 border rounded">
-                    <input type="text" id="emailSubject" placeholder="Email subject" 
-                           class="w-full p-2 border rounded">
-                    <textarea id="emailContent" placeholder="Email content request" 
-                              class="w-full p-2 border rounded h-24"></textarea>
-                    <button onclick="composeEmail()" 
-                            class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">
-                        Compose Email
-                    </button>
+            <div class="agent-card email-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('email')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-envelope text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Email Agent</h3>
+                    <p class="text-sm opacity-90 mb-4">Compose, reply, and manage emails with AI assistance</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Gmail</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">AI Reply</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Smart</span>
+                    </div>
                 </div>
-                <div id="emailResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
             </div>
 
             <!-- Finance Agent -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-semibold mb-4 text-blue-600">💰 Finance Agent</h3>
-                <div class="space-y-4">
-                    <input type="number" id="financeAmount" placeholder="Amount (e.g., 299.99)" 
-                           class="w-full p-2 border rounded">
-                    <input type="text" id="financeDescription" placeholder="Expense description" 
-                           class="w-full p-2 border rounded">
-                    <input type="date" id="financeDate" 
-                           class="w-full p-2 border rounded">
-                    <button onclick="categorizeExpense()" 
-                            class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                        Categorize Expense
-                    </button>
+            <div class="agent-card finance-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('finance')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-chart-line text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Finance Agent</h3>
+                    <p class="text-sm opacity-90 mb-4">Analyze expenses, generate reports, and manage finances</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Reports</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Analysis</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Budget</span>
+                    </div>
                 </div>
-                <div id="financeResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
             </div>
 
-            <!-- Social Agent -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-semibold mb-4 text-purple-600">📱 Social Agent</h3>
-                <div class="space-y-4">
-                    <select id="socialPlatform" class="w-full p-2 border rounded">
-                        <option value="instagram">Instagram</option>
-                        <option value="facebook">Facebook</option>
-                        <option value="linkedin">LinkedIn</option>
-                        <option value="twitter">Twitter</option>
-                    </select>
-                    <input type="text" id="socialTopic" placeholder="Post topic" 
-                           class="w-full p-2 border rounded">
-                    <textarea id="socialContent" placeholder="Content request" 
-                              class="w-full p-2 border rounded h-24"></textarea>
-                    <button onclick="createPost()" 
-                            class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600">
-                        Create Social Post
-                    </button>
+            <!-- Social Media Agent -->
+            <div class="agent-card social-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('social')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-share-alt text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Social Agent</h3>
+                    <p class="text-sm opacity-90 mb-4">Create posts, schedule content, and analyze engagement</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Content</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Schedule</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Analytics</span>
+                    </div>
                 </div>
-                <div id="socialResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
             </div>
 
-            <!-- Customer Agent -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-semibold mb-4 text-orange-600">🎧 Customer Agent</h3>
-                <div class="space-y-4">
-                    <input type="text" id="customerName" placeholder="Customer name" 
-                           class="w-full p-2 border rounded">
-                    <input type="email" id="customerEmail" placeholder="Customer email" 
-                           class="w-full p-2 border rounded">
-                    <textarea id="customerMessage" placeholder="Customer inquiry" 
-                              class="w-full p-2 border rounded h-24"></textarea>
-                    <button onclick="respondToCustomer()" 
-                            class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
-                        Generate Response
-                    </button>
+            <!-- Customer Service Agent -->
+            <div class="agent-card customer-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('customer')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-headset text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Customer Agent</h3>
+                    <p class="text-sm opacity-90 mb-4">Handle inquiries, support tickets, and customer relations</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Support</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Tickets</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Help</span>
+                    </div>
                 </div>
-                <div id="customerResult" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+            </div>
+
+            <!-- Knowledge Agent -->
+            <div class="agent-card knowledge-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('knowledge')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-brain text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Knowledge Agent</h3>
+                    <p class="text-sm opacity-90 mb-4">Upload documents and get intelligent business advice</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">PDF</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Advice</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Search</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orchestrator -->
+            <div class="agent-card orchestrator-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToAgent('orchestrator')">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-cogs text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Orchestrator</h3>
+                    <p class="text-sm opacity-90 mb-4">Coordinate multiple agents for complex business tasks</p>
+                    <div class="flex justify-center space-x-2 text-xs">
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Multi-Agent</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Workflow</span>
+                        <span class="bg-white bg-opacity-20 px-2 py-1 rounded">Automation</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Special Features Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+            
+            <!-- Gmail Integration -->
+            <div class="agent-card gmail-card rounded-xl p-6 text-white cursor-pointer" onclick="navigateToGmail()">
+                <div class="flex items-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-6">
+                        <i class="fab fa-google text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-2">Gmail Integration</h3>
+                        <p class="text-sm opacity-90 mb-3">Connect your Gmail for real email management</p>
+                        <div class="flex space-x-2">
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">Read Emails</span>
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">Send Emails</span>
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">AI Reply</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Dashboard -->
+            <div class="agent-card dashboard-card rounded-xl p-6 text-white cursor-pointer hover:scale-105 transition-all duration-300 shadow-xl" onclick="navigateToKnowledgeDashboard()" style="animation: pulse-glow 2s ease-in-out infinite alternate;">
+                <div class="flex items-center">
+                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-6">
+                        <i class="fas fa-tachometer-alt text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-2">Knowledge Dashboard</h3>
+                        <p class="text-sm opacity-90 mb-3">Advanced document management and AI insights</p>
+                        <div class="flex space-x-2">
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">Upload</span>
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">Analyze</span>
+                            <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">Insights</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="absolute top-2 right-2">
+                    <span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-1 rounded-full font-bold">NEW</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">Quick Actions</h3>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <button onclick="quickAction('compose-email')" class="bg-blue-500 text-white p-4 rounded-lg hover:bg-blue-600 transition-colors">
+                    <i class="fas fa-pen-to-square text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">Compose Email</div>
+                </button>
+                <button onclick="quickAction('financial-report')" class="bg-green-500 text-white p-4 rounded-lg hover:bg-green-600 transition-colors">
+                    <i class="fas fa-file-invoice-dollar text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">Financial Report</div>
+                </button>
+                <button onclick="quickAction('social-post')" class="bg-orange-500 text-white p-4 rounded-lg hover:bg-orange-600 transition-colors">
+                    <i class="fas fa-megaphone text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">Social Post</div>
+                </button>
+                <button onclick="quickAction('customer-support')" class="bg-purple-500 text-white p-4 rounded-lg hover:bg-purple-600 transition-colors">
+                    <i class="fas fa-life-ring text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">Customer Support</div>
+                </button>
+                <button onclick="navigateToKnowledgeDashboard()" class="bg-gradient-to-r from-pink-500 to-purple-500 text-white p-4 rounded-lg hover:from-pink-600 hover:to-purple-600 transition-all shadow-lg">
+                    <i class="fas fa-brain text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">Knowledge Dashboard</div>
+                </button>
             </div>
         </div>
+
+        <!-- System Status -->
+        <div id="systemStatus" class="mt-8 bg-white rounded-xl shadow-lg p-6 hidden">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">System Status</h3>
+            <div id="statusContent" class="text-gray-600">Loading...</div>
+        </div>
+
+    </main>
+
+    <!-- Floating Action Button -->
+    <div class="fixed bottom-6 right-6">
+        <button onclick="showHelp()" class="floating-action bg-gradient-to-r from-blue-600 to-purple-600 text-white w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all">
+            <i class="fas fa-question text-xl"></i>
+        </button>
     </div>
 
     <script>
-        const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
-        let currentSessionId = 'session-' + Date.now();
-        let gmailAccessToken = null;
-        
-        // Enhanced Voice System Variables
-        let recognition = null;
-        let synthesis = null;
-        let isListening = false;
-        let isSpeaking = false;
-        let conversationMode = false;
-        let silenceTimer = null;
-        let finalTranscript = '';
-        let selectedVoice = null;
-        
-        // ElevenLabs Configuration (Free tier: 10K chars/month)
-        const ELEVENLABS_API_KEY = ''; // Add your free API key from elevenlabs.io
-        const ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel voice (natural)
-
-        // Initialize Enhanced Voice System
-        function initVoice() {
-            setupVoiceRecognition();
-            setupSpeechSynthesis();
-            setupVoiceControls();
-        }
-        
-        // Setup Voice Recognition with Silence Detection
-        function setupVoiceRecognition() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                console.warn('Speech recognition not supported');
-                document.getElementById('voiceToggle').disabled = true;
-                document.getElementById('voiceToggle').textContent = '🎤 Voice Not Supported';
-                return;
-            }
-
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-            recognition.maxAlternatives = 1;
-
-            recognition.onstart = () => {
-                isListening = true;
-                updateVoiceStatus('🎤 Listening... (speak now)');
-                updateVoiceButton('listening');
+        // Navigation functions
+        function navigateToAgent(agentType) {
+            const agentUrls = {
+                'email': '/api/email',
+                'finance': '/api/finance', 
+                'social': '/api/social',
+                'customer': '/api/customer',
+                'knowledge': '/api/knowledge',
+                'orchestrator': '/api/orchestrator'
             };
             
-            recognition.onresult = (event) => {
-                let interimTranscript = '';
-                
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
+            if (agentUrls[agentType]) {
+                window.location.href = agentUrls[agentType];
+            }
+        }
 
-                // Update UI with interim results
-                const displayText = interimTranscript || finalTranscript || 'Listening...';
-                updateVoiceStatus(`🎤 ${displayText}`);
+        function navigateToGmail() {
+            window.location.href = '/email-dashboard.html';
+        }
 
-                // Reset silence timer
-                clearTimeout(silenceTimer);
-                silenceTimer = setTimeout(() => {
-                    if (finalTranscript.trim()) {
-                        sendVoiceMessage(finalTranscript.trim());
-                        finalTranscript = '';
-                    }
-                }, 2500); // 2.5 seconds of silence
+        function navigateToKnowledgeDashboard() {
+            window.location.href = '/knowledge';
+        }
+
+        function quickAction(action) {
+            const actionUrls = {
+                'compose-email': '/api/email',
+                'financial-report': '/api/finance',
+                'social-post': '/api/social', 
+                'customer-support': '/api/customer'
             };
             
-            recognition.onend = () => {
-                isListening = false;
-                clearTimeout(silenceTimer);
-                
-                if (conversationMode && !isSpeaking) {
-                    // Auto-restart listening in conversation mode
-                    setTimeout(() => {
-                        if (conversationMode && !isSpeaking) {
-                            startListening();
-                        }
-                    }, 1000);
-                } else {
-                    updateVoiceStatus('Voice recognition ended');
-                    updateVoiceButton('idle');
-                }
-            };
-            
-            recognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
-                isListening = false;
-                updateVoiceStatus(`❌ Error: ${event.error}`);
-                updateVoiceButton('error');
-            };
-        }
-        
-        // Setup Speech Synthesis with Premium Voice Selection
-        function setupSpeechSynthesis() {
-            if ('speechSynthesis' in window) {
-                synthesis = window.speechSynthesis;
-                synthesis.onvoiceschanged = () => {
-                    selectedVoice = selectBestVoice();
-                    loadVoiceOptions();
-                };
-            } else {
-                console.warn('Speech synthesis not supported');
-            }
-        }
-        
-        // Select Best Natural Voice
-        function selectBestVoice() {
-            const voices = synthesis.getVoices();
-            
-            // Priority order for natural voices
-            const preferredVoices = [
-                'Samantha',           // Mac - very natural
-                'Alex',               // Mac - good male voice
-                'David Desktop',      // Windows - natural
-                'Zira Desktop',       // Windows - natural female
-                'Google UK English Female', // Android/Chrome
-                'Google UK English Male',   // Android/Chrome
-                'Microsoft David Desktop',  // Windows fallback
-                'Microsoft Zira Desktop'    // Windows fallback
-            ];
-
-            let selectedVoice = null;
-            
-            for (const preferred of preferredVoices) {
-                selectedVoice = voices.find(voice => 
-                    voice.name.includes(preferred) && voice.lang.includes('en')
-                );
-                if (selectedVoice) break;
-            }
-
-            return selectedVoice || voices.find(voice => voice.lang.includes('en-US')) || voices[0];
-        }
-        
-        // Load Voice Options for Selection
-        function loadVoiceOptions() {
-            const voices = synthesis.getVoices();
-            const voiceSelect = document.getElementById('voiceQuality');
-            
-            // Keep existing options and add browser voices
-            voiceSelect.innerHTML = `
-                <option value="browser">Browser TTS (${selectedVoice?.name || 'Default'})</option>
-                <option value="premium">Premium (ElevenLabs)</option>
-            `;
-        }
-        
-        // Setup Voice Controls
-        function setupVoiceControls() {
-            // Voice speed control
-            document.getElementById('voiceSpeed').addEventListener('input', function() {
-                document.getElementById('speedValue').textContent = this.value + 'x';
-            });
-            
-            // Voice pitch control
-            document.getElementById('voicePitch').addEventListener('input', function() {
-                document.getElementById('pitchValue').textContent = this.value + 'x';
-            });
-            
-            // Conversation mode toggle
-            document.getElementById('conversationMode').addEventListener('change', function() {
-                conversationMode = this.checked;
-                if (conversationMode && !isListening && !isSpeaking) {
-                    setTimeout(() => startListening(), 1000);
-                } else if (!conversationMode && isListening) {
-                    stopListening();
-                }
-            });
-            
-            // Click to interrupt
-            document.addEventListener('click', () => {
-                if (isSpeaking) {
-                    synthesis.cancel();
-                    isSpeaking = false;
-                    if (conversationMode) {
-                        setTimeout(() => startListening(), 500);
-                    }
-                }
-            });
-        }
-        
-        // Toggle Voice Mode
-        function toggleVoiceMode() {
-            if (isListening) {
-                stopVoiceMode();
-            } else {
-                startVoiceMode();
-            }
-        }
-        
-        // Start Voice Mode
-        function startVoiceMode() {
-            conversationMode = document.getElementById('conversationMode').checked;
-            document.getElementById('textInputSection').style.display = 'none';
-            updateVoiceButton('listening');
-            startListening();
-        }
-        
-        // Stop Voice Mode
-        function stopVoiceMode() {
-            conversationMode = false;
-            document.getElementById('conversationMode').checked = false;
-            document.getElementById('textInputSection').style.display = 'flex';
-            stopListening();
-            synthesis.cancel();
-            updateVoiceStatus('Voice chat ended');
-            updateVoiceButton('idle');
-        }
-        
-        // Start Listening
-        function startListening() {
-            if (recognition && !isListening) {
-                recognition.start();
-            }
-        }
-        
-        // Stop Listening
-        function stopListening() {
-            if (recognition && isListening) {
-                recognition.stop();
-            }
-        }
-        
-        // Send Voice Message
-        async function sendVoiceMessage(message) {
-            if (!message.trim()) return;
-            
-            // Add user message to chat
-            addChatMessage('user', message);
-            updateVoiceStatus('🤔 Processing...');
-            
-            try {
-                const result = await apiCall('/api/chat', 'POST', {
-                    message: message,
-                    sessionId: currentSessionId,
-                    gmailAccessToken: gmailAccessToken
-                });
-                
-                if (result.status === 'success') {
-                    addChatMessage('assistant', result.response.content);
-                    
-                    // Speak the response
-                    await speakMessage(result.response.content);
-                } else {
-                    addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-                    await speakMessage('Sorry, I encountered an error. Please try again.');
-                }
-            } catch (error) {
-                addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-                await speakMessage('Sorry, I encountered an error. Please try again.');
-            }
-        }
-        
-        // Enhanced Speech Function with Premium TTS
-        async function speakMessage(text) {
-            const voiceQuality = document.getElementById('voiceQuality').value;
-            
-            if (voiceQuality === 'premium' && ELEVENLABS_API_KEY) {
-                try {
-                    await speakWithElevenLabs(text);
-                    return;
-                } catch (error) {
-                    console.log('ElevenLabs failed, falling back to browser TTS');
-                }
-            }
-            
-            // Fallback to browser TTS
-            await speakWithBrowser(text);
-        }
-        
-        // Premium TTS with ElevenLabs
-        async function speakWithElevenLabs(text) {
-            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'audio/mpeg',
-                    'Content-Type': 'application/json',
-                    'xi-api-key': ELEVENLABS_API_KEY
-                },
-                body: JSON.stringify({
-                    text: text,
-                    model_id: "eleven_monolingual_v1",
-                    voice_settings: {
-                        stability: 0.5,
-                        similarity_boost: 0.5
-                    }
-                })
-            });
-            
-            if (response.ok) {
-                const audioBlob = await response.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                
-                isSpeaking = true;
-                updateVoiceStatus('🔊 Speaking...');
-                
-                return new Promise((resolve, reject) => {
-                    audio.onended = () => {
-                        isSpeaking = false;
-                        if (conversationMode) {
-                            setTimeout(() => startListening(), 500);
-                        }
-                        resolve();
-                    };
-                    audio.onerror = reject;
-                    audio.play();
-                });
-            } else {
-                throw new Error('ElevenLabs API error');
-            }
-        }
-        
-        // Browser TTS with Enhanced Settings
-        async function speakWithBrowser(text) {
-            if (!synthesis) return;
-            
-            // Stop any current speech
-            synthesis.cancel();
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Apply voice settings
-            if (selectedVoice) utterance.voice = selectedVoice;
-            utterance.rate = parseFloat(document.getElementById('voiceSpeed').value);
-            utterance.pitch = parseFloat(document.getElementById('voicePitch').value);
-            utterance.volume = 0.9;
-            
-            isSpeaking = true;
-            updateVoiceStatus('🔊 Speaking...');
-            
-            return new Promise((resolve, reject) => {
-                utterance.onend = () => {
-                    isSpeaking = false;
-                    if (conversationMode) {
-                        setTimeout(() => startListening(), 500);
-                    }
-                    resolve();
-                };
-                
-                utterance.onerror = (event) => {
-                    console.error('Speech synthesis error:', event.error);
-                    isSpeaking = false;
-                    reject(event.error);
-                };
-                
-                synthesis.speak(utterance);
-            });
-        }
-        
-        // Update Voice Status
-        function updateVoiceStatus(status) {
-            document.getElementById('voiceStatus').textContent = status;
-        }
-        
-        // Update Voice Button
-        function updateVoiceButton(state) {
-            const button = document.getElementById('voiceToggle');
-            
-            switch (state) {
-                case 'listening':
-                    button.className = 'bg-red-500 text-white px-8 py-4 rounded-full text-lg hover:bg-red-600 transition-all shadow-lg hover:shadow-xl voice-pulse';
-                    button.textContent = '🔴 Stop Voice Chat';
-                    break;
-                    
-                case 'speaking':
-                    button.className = 'bg-green-500 text-white px-8 py-4 rounded-full text-lg hover:bg-green-600 transition-all shadow-lg hover:shadow-xl voice-pulse';
-                    button.textContent = '🟢 Speaking...';
-                    break;
-                    
-                case 'error':
-                    button.className = 'bg-yellow-500 text-white px-8 py-4 rounded-full text-lg hover:bg-yellow-600 transition-all shadow-lg hover:shadow-xl';
-                    button.textContent = '⚠️ Voice Error';
-                    break;
-                    
-                default:
-                    button.className = 'bg-green-500 text-white px-8 py-4 rounded-full text-lg hover:bg-green-600 transition-all shadow-lg hover:shadow-xl';
-                    button.textContent = '🎤 Start Voice Chat';
-                    break;
+            if (actionUrls[action]) {
+                window.location.href = actionUrls[action];
             }
         }
 
-        // Gmail Integration Functions
-        // Load Gmail token from localStorage on page load
-        function loadGmailToken() {
-            const savedToken = localStorage.getItem('gmailAccessToken');
-            if (savedToken) {
-                gmailAccessToken = savedToken;
-                updateGmailStatus(true, 'Gmail connected (from saved session)');
-                return true;
-            }
-            return false;
-        }
-        
-        // Save Gmail token to localStorage
-        function saveGmailToken(token) {
-            gmailAccessToken = token;
-            localStorage.setItem('gmailAccessToken', token);
-        }
-        
-        // Clear Gmail token from localStorage
-        function clearGmailToken() {
-            gmailAccessToken = null;
-            localStorage.removeItem('gmailAccessToken');
-        }
-        
-        function connectGmail() {
-            // Get the auth URL from the server
-            fetch(`${API_BASE}/api/auth/gmail`)
+        function checkSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
+            const statusContent = document.getElementById('statusContent');
+            
+            statusDiv.classList.remove('hidden');
+            statusContent.innerHTML = 'Checking system status...';
+            
+            fetch('/health')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        // For web app flow, redirect the current window
-                        window.location.href = data.authUrl;
-                    } else {
-                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
-                    }
+                    statusContent.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <div class="font-semibold text-green-800">System Status</div>
+                                <div class="text-green-600">${data.status}</div>
+                            </div>
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <div class="font-semibold text-blue-800">Service</div>
+                                <div class="text-blue-600">${data.service}</div>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <div class="font-semibold text-purple-800">Version</div>
+                                <div class="text-purple-600">${data.version}</div>
+                            </div>
+                        </div>
+                    `;
                 })
                 .catch(error => {
-                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
-                });
-        }
-        
-        function disconnectGmail() {
-            clearGmailToken();
-            updateGmailStatus(false, 'Gmail disconnected');
-            showNotification('🔌 Gmail disconnected', 'info');
-        }
-        
-        function checkGmailAuthCallback() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const gmailAuth = urlParams.get('gmail_auth');
-            
-            if (gmailAuth === 'success') {
-                const accessToken = urlParams.get('access_token');
-                const refreshToken = urlParams.get('refresh_token');
-                
-                if (accessToken) {
-                    saveGmailToken(accessToken);
-                    updateGmailStatus(true, 'Gmail connected successfully!');
-                    
-                    // Clean up URL parameters
-                    const cleanUrl = window.location.pathname;
-                    window.history.replaceState({}, document.title, cleanUrl);
-                    
-                    // Show success message
-                    showNotification('✅ Gmail connected successfully!', 'success');
-                }
-            } else if (gmailAuth === 'error') {
-                const error = urlParams.get('error');
-                updateGmailStatus(false, 'Gmail authentication failed: ' + (error || 'Unknown error'));
-                
-                // Clean up URL parameters
-                const cleanUrl = window.location.pathname;
-                window.history.replaceState({}, document.title, cleanUrl);
-                
-                // Show error message
-                showNotification('❌ Gmail authentication failed', 'error');
-            }
-        }
-        
-        function showNotification(message, type = 'info') {
-            // Create notification element
-            const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-                type === 'success' ? 'bg-green-500 text-white' : 
-                type === 'error' ? 'bg-red-500 text-white' : 
-                'bg-blue-500 text-white'
-            }`;
-            notification.textContent = message;
-            
-            // Add to page
-            document.body.appendChild(notification);
-            
-            // Remove after 5 seconds
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 5000);
-        }
-        
-        function updateGmailStatus(connected, message) {
-            const statusDiv = document.getElementById('gmailStatus');
-            const actionsDiv = document.getElementById('gmailActions');
-            
-            if (connected) {
-                statusDiv.innerHTML = `<span class="text-green-600">✅ ${message}</span>`;
-                actionsDiv.classList.remove('hidden');
-            } else {
-                statusDiv.innerHTML = `<span class="text-red-600">❌ ${message}</span>`;
-                actionsDiv.classList.add('hidden');
-            }
-        }
-        
-        async function checkRealEmails() {
-            if (!gmailAccessToken) {
-                alert('Please connect Gmail first');
-                return;
-            }
-            
-            try {
-                const result = await apiCall('/api/gmail/check-emails', 'POST', {
-                    accessToken: gmailAccessToken
-                });
-                
-                if (result.status === 'success') {
-                    displayEmailResults(result.result);
-                } else {
-                    alert('Failed to check emails: ' + result.message);
-                }
-            } catch (error) {
-                alert('Error checking emails: ' + error.message);
-            }
-        }
-        
-        function displayEmailResults(result) {
-            const resultsDiv = document.getElementById('gmailResults');
-            const emailListDiv = document.getElementById('emailList');
-            
-            emailListDiv.innerHTML = `
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h3 class="font-semibold text-lg mb-2">📬 Email Summary</h3>
-                    <p class="text-sm text-gray-600 mb-3">
-                        Total: ${result.totalEmails} emails | Unread: ${result.unreadCount}
-                    </p>
-                    
-                    ${result.summaries.length > 0 ? `
-                        <div class="space-y-2">
-                            <h4 class="font-medium text-sm text-gray-700">Unread Emails:</h4>
-                            ${result.summaries.map(email => `
-                                <div class="border-l-4 border-blue-500 pl-3 py-2 bg-blue-50 rounded">
-                                    <div class="font-medium text-sm">${email.from}</div>
-                                    <div class="text-sm text-gray-600">${email.subject}</div>
-                                    <div class="text-xs text-gray-500">${email.summary}</div>
-                                    <div class="text-xs text-gray-400 mt-1">
-                                        Priority: ${email.priority} | ${email.requiresAction ? '⚠️ Action Required' : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
+                    statusContent.innerHTML = `
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <div class="font-semibold text-red-800">Error</div>
+                            <div class="text-red-600">Failed to check system status: ${error.message}</div>
                         </div>
-                    ` : '<p class="text-sm text-gray-500">No unread emails</p>'}
-                </div>
-            `;
-            
-            resultsDiv.classList.remove('hidden');
-        }
-        
-        function showSendEmailForm() {
-            const recipient = prompt('Enter recipient email:');
-            if (!recipient) return;
-            
-            const subject = prompt('Enter email subject:');
-            if (!subject) return;
-            
-            const content = prompt('Enter email content:');
-            if (!content) return;
-            
-            sendRealEmail(recipient, subject, content);
-        }
-        
-        async function sendRealEmail(to, subject, content) {
-            if (!gmailAccessToken) {
-                alert('Please connect Gmail first');
-                return;
-            }
-            
-            try {
-                const result = await apiCall('/api/gmail/send-email', 'POST', {
-                    accessToken: gmailAccessToken,
-                    to,
-                    subject,
-                    content
+                    `;
                 });
-                
-                if (result.status === 'success') {
-                    alert(result.result.message);
-                } else {
-                    alert('Failed to send email: ' + result.message);
-                }
-            } catch (error) {
-                alert('Error sending email: ' + error.message);
-            }
         }
 
-        async function apiCall(endpoint, method = 'GET', data = null) {
-            try {
-                const config = {
-                    method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                };
-                if (data) {
-                    config.body = JSON.stringify(data);
-                }
-                
-                const response = await fetch(`${API_BASE}${endpoint}`, config);
-                return await response.json();
-            } catch (error) {
-                return { error: error.message };
-            }
+        function showHelp() {
+            alert(`Business Agent System Help:
+
+🤖 AGENTS:
+• Email Agent: Compose and manage emails
+• Finance Agent: Financial analysis and reports  
+• Social Agent: Social media content and engagement
+• Customer Agent: Customer service and support
+• Knowledge Agent: Document analysis and business advice
+• Orchestrator: Coordinate multiple agents
+
+📧 FEATURES:
+• Gmail Integration: Real email management
+• Knowledge Dashboard: Advanced document processing
+• Quick Actions: Fast access to common tasks
+
+💡 TIP: Click any agent card to access its specific interface!`);
         }
 
-        // Chat Functions
-        async function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            
-            if (!message) return;
-            
-            // Add user message to chat
-            addChatMessage('user', message);
-            input.value = '';
-            
-            // Show typing indicator
-            addTypingIndicator();
-            
-            try {
-                const result = await apiCall('/api/chat', 'POST', {
-                    message: message,
-                    sessionId: currentSessionId,
-                    gmailAccessToken: gmailAccessToken
-                });
-                
-                // Remove typing indicator
-                removeTypingIndicator();
-                
-                if (result.status === 'success') {
-                    addChatMessage('assistant', result.response.content);
-                } else {
-                    addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-                }
-            } catch (error) {
-                removeTypingIndicator();
-                addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-            }
-        }
-
-        function addChatMessage(role, content) {
-            const chatMessages = document.getElementById('chatMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-            
-            const bubble = document.createElement('div');
-            bubble.className = `max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                role === 'user' 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-white text-gray-800 border'
-            }`;
-            bubble.textContent = content;
-            
-            messageDiv.appendChild(bubble);
-            chatMessages.appendChild(messageDiv);
-            
-            // Scroll to bottom
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function addTypingIndicator() {
-            const chatMessages = document.getElementById('chatMessages');
-            const typingDiv = document.createElement('div');
-            typingDiv.id = 'typing-indicator';
-            typingDiv.className = 'flex justify-start';
-            
-            const bubble = document.createElement('div');
-            bubble.className = 'bg-gray-200 text-gray-600 px-4 py-2 rounded-lg';
-            bubble.textContent = 'Typing...';
-            
-            typingDiv.appendChild(bubble);
-            chatMessages.appendChild(typingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function removeTypingIndicator() {
-            const typingIndicator = document.getElementById('typing-indicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-        }
-
-        function clearChat() {
-            const chatMessages = document.getElementById('chatMessages');
-            chatMessages.innerHTML = '<div class="text-center text-gray-500">Start a conversation with your AI assistant...</div>';
-            
-            // Generate new session ID
-            currentSessionId = 'session-' + Date.now();
-        }
-
-        async function checkStatus() {
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = 'Loading...';
-            
-            const result = await apiCall('/api/status');
-            if (result.status === 'success') {
-                statusDiv.innerHTML = `
-                    <div class="text-green-600">✅ System Online</div>
-                    <div class="text-sm text-gray-500 mt-2">
-                        Agents: ${Object.entries(result.system.agents).map(([name, status]) => 
-                            `${name}: ${status}`).join(', ')}
-                    </div>
-                    <div class="text-sm text-gray-500 mt-1">
-                        Integrations: ${Object.entries(result.system.integrations || {}).map(([name, status]) => 
-                            `${name}: ${status}`).join(', ')}
-                    </div>
-                `;
-            } else {
-                statusDiv.innerHTML = '<div class="text-red-600">❌ System Error</div>';
-            }
-        }
-
-        async function composeEmail() {
-            const recipient = document.getElementById('emailRecipient').value;
-            const subject = document.getElementById('emailSubject').value;
-            const content = document.getElementById('emailContent').value;
-            
-            if (!recipient || !subject || !content) {
-                alert('Please fill all email fields');
-                return;
-            }
-
-            const result = await apiCall('/api/email/compose', 'POST', {
-                recipient, subject, content
-            });
-
-            const resultDiv = document.getElementById('emailResult');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `
-                <h4 class="font-semibold">Generated Email:</h4>
-                <div class="mt-2 whitespace-pre-wrap">${result.result?.content || 'Error generating email'}</div>
-            `;
-        }
-
-        async function categorizeExpense() {
-            const amount = parseFloat(document.getElementById('financeAmount').value);
-            const description = document.getElementById('financeDescription').value;
-            const date = document.getElementById('financeDate').value;
-            
-            if (!amount || !description || !date) {
-                alert('Please fill all finance fields');
-                return;
-            }
-
-            const result = await apiCall('/api/finance/categorize', 'POST', {
-                amount, description, date
-            });
-
-            const resultDiv = document.getElementById('financeResult');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `
-                <h4 class="font-semibold">Expense Analysis:</h4>
-                <div class="mt-2">
-                    <div><strong>Category:</strong> ${result.result?.categorization?.category || 'Unknown'}</div>
-                    <div><strong>Tax Deductible:</strong> ${result.result?.categorization?.taxDeductible ? 'Yes' : 'No'}</div>
-                    <div><strong>Confidence:</strong> ${result.result?.categorization?.confidence || 'Unknown'}</div>
-                </div>
-            `;
-        }
-
-        async function createPost() {
-            const platform = document.getElementById('socialPlatform').value;
-            const topic = document.getElementById('socialTopic').value;
-            const content = document.getElementById('socialContent').value;
-            
-            if (!topic || !content) {
-                alert('Please fill topic and content fields');
-                return;
-            }
-
-            const result = await apiCall('/api/social/create-post', 'POST', {
-                platform, topic, content, tone: 'professional'
-            });
-
-            const resultDiv = document.getElementById('socialResult');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `
-                <h4 class="font-semibold">Generated ${platform} Post:</h4>
-                <div class="mt-2 whitespace-pre-wrap">${result.result?.content || 'Error generating post'}</div>
-                ${result.result?.hashtags ? `<div class="mt-2 text-blue-600">${result.result.hashtags.join(' ')}</div>` : ''}
-            `;
-        }
-
-        async function respondToCustomer() {
-            const name = document.getElementById('customerName').value;
-            const email = document.getElementById('customerEmail').value;
-            const message = document.getElementById('customerMessage').value;
-            
-            if (!name || !email || !message) {
-                alert('Please fill all customer fields');
-                return;
-            }
-
-            const result = await apiCall('/api/customer/respond', 'POST', {
-                customerName: name,
-                email: email,
-                message: message,
-                channel: 'web'
-            });
-
-            const resultDiv = document.getElementById('customerResult');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `
-                <h4 class="font-semibold">Customer Service Response:</h4>
-                <div class="mt-2 whitespace-pre-wrap">${result.result?.response || 'Error generating response'}</div>
-            `;
-        }
-
-        // Initialize everything when page loads
-        window.addEventListener('load', function() {
-            initVoice();
-            checkStatus();
-            loadGmailToken(); // Load saved Gmail token
-            checkGmailAuthCallback(); // Check for Gmail OAuth callback
-            
-            // Set up voice toggle button
-            document.getElementById('voiceToggle').addEventListener('click', toggleVoiceMode);
+        // Check system status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemStatus();
         });
     </script>
 </body>
