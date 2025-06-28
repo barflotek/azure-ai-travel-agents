@@ -51,6 +51,31 @@ class KnowledgeService {
         console.log('✅ RAGFlow: Connection successful');
         this.ragflowEnabled = true;
         
+        // Get existing chat assistants to see if any have proper model configuration
+        const chatsResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        });
+        
+        if (chatsResponse.ok) {
+          const chatsResult = await chatsResponse.json();
+          if (chatsResult.code === 0 && chatsResult.data && chatsResult.data.length > 0) {
+            // Find a chat assistant with a proper model name
+            const workingChat = chatsResult.data.find(chat => 
+              chat.llm && chat.llm.model_name && chat.llm.model_name.trim() !== ''
+            );
+            
+            if (workingChat) {
+              this.chatId = workingChat.id;
+              console.log(`✅ RAGFlow: Using existing chat assistant with ID: ${this.chatId}`);
+              return true;
+            }
+          }
+        }
+        
         // Create a new chat assistant with proper configuration
         console.log('🤖 RAGFlow: Creating chat assistant...');
         const uniqueName = `Business Knowledge Agent ${Date.now()}`;
@@ -69,7 +94,8 @@ class KnowledgeService {
               temperature: 0.1,
               top_p: 0.3,
               presence_penalty: 0.4,
-              frequency_penalty: 0.7
+              frequency_penalty: 0.7,
+              max_tokens: 2048
             },
             prompt: {
               similarity_threshold: 0.2,
@@ -155,7 +181,7 @@ class KnowledgeService {
 
       let result = await response.json();
 
-      // If error: You don't own the chat, create a new chat assistant and retry
+      // If error: You don't own the chat or model not set, create a new chat assistant and retry
       if (result.message && (result.message.includes("don't own the chat") || result.message.includes("Type of chat model is not set"))) {
         console.log('⚠️ RAGFlow: Creating a new chat assistant for this user...');
         const uniqueName = `Business Knowledge Agent ${Date.now()}`;
@@ -171,7 +197,8 @@ class KnowledgeService {
               temperature: 0.1,
               top_p: 0.3,
               presence_penalty: 0.4,
-              frequency_penalty: 0.7
+              frequency_penalty: 0.7,
+              max_tokens: 2048
             },
             prompt: {
               similarity_threshold: 0.2,
