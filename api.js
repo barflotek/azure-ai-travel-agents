@@ -20,7 +20,20 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the frontend at root
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const mainPage = `
+    <div style="text-align: center; padding: 50px;">
+      <h1>🤖 Business Agent System</h1>
+      <div style="margin: 30px;">
+        <a href="/email-dashboard" style="display: inline-block; margin: 10px; padding: 15px 30px; background: #3B82F6; color: white; text-decoration: none; border-radius: 8px;">
+          📧 Advanced Email Management
+        </a>
+        <a href="/index.html" style="display: inline-block; margin: 10px; padding: 15px 30px; background: #10B981; color: white; text-decoration: none; border-radius: 8px;">
+          🎯 Agent Dashboard
+        </a>
+      </div>
+    </div>
+  `;
+  res.send(mainPage);
 });
 
 // Health check endpoint
@@ -497,6 +510,132 @@ app.delete('/api/chat/history/:sessionId', async (req, res) => {
   }
 });
 
+// Serve the advanced email dashboard
+app.get('/email-dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/email-dashboard.html'));
+});
+
+// Advanced Gmail API routes
+app.post('/api/gmail/bulk-action', async (req, res) => {
+  try {
+    const { accessToken, emailIds, action } = req.body;
+    
+    if (!accessToken || !emailIds || !action) {
+      return res.json({ status: 'error', message: 'Missing required parameters' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.performBulkAction(emailIds, action);
+    
+    res.json({ status: 'success', result });
+  } catch (error) {
+    console.error('Bulk action error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/gmail/ai-suggestions', async (req, res) => {
+  try {
+    const { accessToken, emails } = req.body;
+    
+    if (!accessToken || !emails) {
+      return res.json({ status: 'error', message: 'Missing required parameters' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const suggestions = emailAgent.generateAISuggestions(emails);
+    
+    res.json({ status: 'success', suggestions });
+  } catch (error) {
+    console.error('AI suggestions error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/gmail/ai-reply', async (req, res) => {
+  try {
+    const { accessToken, emailId, replyType = 'quick' } = req.body;
+    
+    if (!accessToken || !emailId) {
+      return res.json({ status: 'error', message: 'Missing required parameters' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const reply = await emailAgent.generateAIReply(emailId, replyType);
+    
+    res.json({ status: 'success', reply });
+  } catch (error) {
+    console.error('AI reply error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/gmail/analytics', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+    
+    if (!accessToken) {
+      return res.json({ status: 'error', message: 'Missing access token' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const analytics = await emailAgent.getEmailAnalytics();
+    
+    res.json({ status: 'success', analytics });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/gmail/mark-read', async (req, res) => {
+  try {
+    const { accessToken, emailId } = req.body;
+    
+    if (!accessToken || !emailId) {
+      return res.json({ status: 'error', message: 'Missing required parameters' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const success = await emailAgent.markEmailAsRead(emailId);
+    
+    res.json({ status: success ? 'success' : 'error', message: success ? 'Email marked as read' : 'Failed to mark email as read' });
+  } catch (error) {
+    console.error('Mark as read error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/gmail/delete-email', async (req, res) => {
+  try {
+    const { accessToken, emailId } = req.body;
+    
+    if (!accessToken || !emailId) {
+      return res.json({ status: 'error', message: 'Missing required parameters' });
+    }
+
+    const emailAgent = new EmailAgent('user-1');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const success = await emailAgent.deleteEmail(emailId);
+    
+    res.json({ status: success ? 'success' : 'error', message: success ? 'Email deleted' : 'Failed to delete email' });
+  } catch (error) {
+    console.error('Delete email error:', error);
+    res.json({ status: 'error', message: error.message });
+  }
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -521,7 +660,14 @@ app.use('*', (req, res) => {
       'POST /api/customer/respond',
       'POST /api/chat',
       'GET /api/chat/history/:sessionId',
-      'DELETE /api/chat/history/:sessionId'
+      'DELETE /api/chat/history/:sessionId',
+      'GET /email-dashboard',
+      'POST /api/gmail/bulk-action',
+      'POST /api/gmail/ai-suggestions',
+      'POST /api/gmail/ai-reply',
+      'POST /api/gmail/analytics',
+      'POST /api/gmail/mark-read',
+      'POST /api/gmail/delete-email'
     ],
     timestamp: new Date().toISOString()
   });

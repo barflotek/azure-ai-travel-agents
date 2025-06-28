@@ -26,6 +26,15 @@ export interface EmailSummary {
   requiresAction: boolean;
   date: Date;
   priority: 'high' | 'medium' | 'low';
+  category?: string;
+  sentiment?: 'positive' | 'neutral' | 'negative';
+  suggestedResponse?: string;
+  extractedInfo?: {
+    dates: string[];
+    people: string[];
+    companies: string[];
+    actionItems: string[];
+  };
 }
 
 export interface SendEmailResult {

@@ -144,6 +144,38 @@ export class GmailClient {
     }
   }
 
+  async archiveEmail(messageId: string): Promise<boolean> {
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: messageId,
+        requestBody: {
+          removeLabelIds: ['INBOX']
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('Error archiving email:', error);
+      return false;
+    }
+  }
+
+  async markAsImportant(messageId: string): Promise<boolean> {
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: messageId,
+        requestBody: {
+          addLabelIds: ['IMPORTANT']
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('Error marking email as important:', error);
+      return false;
+    }
+  }
+
   async searchEmails(query: string, maxResults: number = 10): Promise<GmailMessage[]> {
     try {
       const response = await this.gmail.users.messages.list({

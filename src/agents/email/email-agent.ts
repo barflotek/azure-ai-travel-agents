@@ -56,7 +56,7 @@ export class EmailAgent {
           result = await this.replyToEmail(task);
           break;
         case 'categorize':
-          result = await this.categorizeEmail(task);
+          result = await this.categorizeEmailTask(task);
           break;
         case 'summarize':
           result = await this.summarizeEmail(task);
@@ -189,26 +189,39 @@ export class EmailAgent {
   // AI-powered email summarization for real emails
   private async summarizeRealEmail(email: GmailMessage): Promise<EmailSummary> {
     const prompt = `
-Summarize this email in 1-2 sentences, focusing on key points and any required actions:
+Analyze this email comprehensively and provide structured analysis:
 
 From: ${email.from}
 Subject: ${email.subject}
-Body: ${email.body.substring(0, 500)}
+Body: ${email.body.substring(0, 1000)}
 
-Also determine if this email requires action (reply, follow-up, etc.) and assign priority (high/medium/low).
-Respond in JSON format: {"summary": "...", "requiresAction": true/false, "priority": "high/medium/low"}
+Provide analysis in this JSON format:
+{
+  "summary": "2-3 sentence summary",
+  "priority": "high/medium/low",
+  "category": "work/personal/newsletter/promotional/urgent/meeting",
+  "sentiment": "positive/neutral/negative",
+  "requiresAction": true/false,
+  "suggestedResponse": "brief response suggestion",
+  "extractedInfo": {
+    "dates": ["any dates mentioned"],
+    "people": ["people mentioned"],
+    "companies": ["companies mentioned"],
+    "actionItems": ["specific actions needed"]
+  }
+}
 `;
 
     const messages: LLMMessage[] = [
-      { role: 'system', content: 'You are an email summarization assistant. Respond in JSON format.' },
+      { role: 'system', content: 'You are an expert email analysis AI. Provide structured analysis in JSON format.' },
       { role: 'user', content: prompt }
     ];
 
-    const response = await this.llmRouter.route(messages, 'simple');
+    const response = await this.llmRouter.route(messages, 'medium');
     
     try {
       const content = response.message?.content || '{}';
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = typeof content === 'string' ? content.match(/\{[\s\S]*\}/) : null;
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {
@@ -218,24 +231,178 @@ Respond in JSON format: {"summary": "...", "requiresAction": true/false, "priori
           summary: parsed.summary || 'No summary available',
           requiresAction: parsed.requiresAction || false,
           date: email.date,
-          priority: parsed.priority || 'medium'
+          priority: parsed.priority || 'medium',
+          category: parsed.category || 'personal',
+          sentiment: parsed.sentiment || 'neutral',
+          suggestedResponse: parsed.suggestedResponse || '',
+          extractedInfo: parsed.extractedInfo || { dates: [], people: [], companies: [], actionItems: [] }
         };
       }
     } catch (error) {
-      console.error('Error parsing email summary:', error);
+      console.warn('Failed to parse AI analysis, using fallback');
     }
 
-    // Fallback summary
+    // Fallback analysis
     return {
       id: email.id,
       from: email.from,
       subject: email.subject,
       summary: email.body.substring(0, 100) + '...',
-      requiresAction: email.subject.toLowerCase().includes('urgent') || 
-                     email.subject.toLowerCase().includes('action'),
+      priority: this.calculatePriority(email),
+      category: this.categorizeEmail(email),
+      sentiment: 'neutral',
+      requiresAction: email.body.toLowerCase().includes('please') || email.body.includes('?'),
       date: email.date,
-      priority: 'medium'
+      suggestedResponse: 'Thank you for your email. I will review and respond accordingly.',
+      extractedInfo: {
+        dates: [],
+        people: [],
+        companies: [],
+        actionItems: []
+      }
     };
+  }
+
+  // Generate AI reply suggestions
+  async generateAIReply(emailId: string, replyType: 'quick' | 'detailed' | 'decline'): Promise<any> {
+    if (!this.gmailClient) {
+      throw new Error('Gmail not connected. Please authenticate first.');
+    }
+
+    const email = await this.gmailClient.getEmailById(emailId);
+    if (!email) {
+      throw new Error('Email not found');
+    }
+    
+    const prompts = {
+      quick: `Generate a brief, professional reply to this email: ${email.body.substring(0, 500)}`,
+      detailed: `Generate a comprehensive, professional reply addressing all points in this email: ${email.body}`,
+      decline: `Generate a polite decline/rejection response to this email: ${email.body.substring(0, 500)}`
+    };
+
+    const messages: LLMMessage[] = [
+      { role: 'system', content: 'You are a professional email assistant. Generate appropriate email replies.' },
+      { role: 'user', content: prompts[replyType] }
+    ];
+
+    const response = await this.llmRouter.route(messages, 'medium');
+    
+    return {
+      replyType,
+      subject: `Re: ${email.subject}`,
+      body: response.message?.content || 'Error generating reply',
+      originalEmail: {
+        id: emailId,
+        from: email.from,
+        subject: email.subject
+      }
+    };
+  }
+
+  // Bulk email actions
+  async performBulkAction(emailIds: string[], action: 'read' | 'delete' | 'archive' | 'important'): Promise<any> {
+    if (!this.gmailClient) {
+      throw new Error('Gmail not connected. Please authenticate first.');
+    }
+
+    const results: Array<{ emailId: string; success: boolean; action: string; error?: string }> = [];
+    
+    for (const emailId of emailIds) {
+      try {
+        let success = false;
+        
+        switch (action) {
+          case 'read':
+            success = await this.gmailClient.markAsRead(emailId);
+            break;
+          case 'delete':
+            success = await this.gmailClient.deleteEmail(emailId);
+            break;
+          case 'archive':
+            success = await this.gmailClient.archiveEmail(emailId);
+            break;
+          case 'important':
+            success = await this.gmailClient.markAsImportant(emailId);
+            break;
+        }
+        
+        results.push({ emailId, success, action });
+      } catch (error: any) {
+        results.push({ emailId, success: false, action, error: error.message });
+      }
+    }
+    
+    return {
+      action,
+      totalProcessed: emailIds.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      details: results
+    };
+  }
+
+  // Email analytics
+  async getEmailAnalytics(): Promise<any> {
+    if (!this.gmailClient) {
+      throw new Error('Gmail not connected. Please authenticate first.');
+    }
+
+    const emails = await this.gmailClient.getRecentEmails(100);
+    
+    return {
+      totalEmails: emails.length,
+      unreadCount: emails.filter(e => !e.isRead).length,
+      todayCount: emails.filter(e => this.isToday(e.date)).length,
+      thisWeekCount: emails.filter(e => this.isThisWeek(e.date)).length,
+      
+      // Priority distribution
+      priorityBreakdown: {
+        high: emails.filter(e => this.calculatePriority(e) === 'high').length,
+        medium: emails.filter(e => this.calculatePriority(e) === 'medium').length,
+        low: emails.filter(e => this.calculatePriority(e) === 'low').length
+      },
+      
+      // Category distribution
+      categoryBreakdown: this.getCategoryBreakdown(emails),
+      
+      // Response time analytics
+      averageResponseTime: this.calculateAverageResponseTime(emails),
+      
+      // Sender analytics
+      topSenders: this.getTopSenders(emails),
+      
+      // Time analytics
+      emailsByHour: this.getEmailsByHour(emails),
+      emailsByDay: this.getEmailsByDay(emails)
+    };
+  }
+
+  // Generate AI suggestions based on email patterns
+  generateAISuggestions(emails: GmailMessage[]): string[] {
+    const suggestions: string[] = [];
+    const urgentCount = emails.filter(e => this.calculatePriority(e) === 'high').length;
+    const unreadCount = emails.filter(e => !e.isRead).length;
+    const oldestUnread = emails.filter(e => !e.isRead).sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+    
+    if (urgentCount > 3) {
+      suggestions.push(`You have ${urgentCount} high-priority emails. Consider addressing them first.`);
+    }
+    
+    if (unreadCount > 20) {
+      suggestions.push(`${unreadCount} unread emails detected. Consider using bulk actions to manage your inbox.`);
+    }
+    
+    if (oldestUnread && this.daysSince(oldestUnread.date) > 3) {
+      suggestions.push(`Your oldest unread email is ${this.daysSince(oldestUnread.date)} days old. Consider reviewing older emails.`);
+    }
+    
+    // Pattern-based suggestions
+    const newsletterCount = emails.filter(e => this.categorizeEmail(e) === 'newsletter').length;
+    if (newsletterCount > 10) {
+      suggestions.push('Consider unsubscribing from newsletters you no longer read to reduce inbox clutter.');
+    }
+    
+    return suggestions;
   }
 
   private async composeEmail(task: EmailTask) {
@@ -279,7 +446,7 @@ Format your response as JSON with "subject" and "body" fields.
     return this.parseEmailResponse(response);
   }
 
-  private async categorizeEmail(task: EmailTask) {
+  private async categorizeEmailTask(task: EmailTask) {
     const prompt = `
 Categorize this email into one of these categories:
 - urgent
@@ -302,8 +469,9 @@ Respond with just the category name.
     ];
 
     const response = await this.llmRouter.route(messages, 'simple');
+    const content = response.message?.content;
     return {
-      category: response.message?.content?.trim().toLowerCase(),
+      category: typeof content === 'string' ? content.trim().toLowerCase() : 'personal',
       confidence: 'high' // TODO: Add confidence scoring
     };
   }
@@ -321,9 +489,10 @@ ${task.content}
     ];
 
     const response = await this.llmRouter.route(messages, 'simple');
+    const content = response.message?.content;
     return {
-      summary: response.message?.content?.trim(),
-      actionRequired: response.message?.content?.includes('action') || response.message?.content?.includes('reply')
+      summary: typeof content === 'string' ? content.trim() : 'No summary available',
+      actionRequired: typeof content === 'string' ? (content.includes('action') || content.includes('reply')) : false
     };
   }
 
@@ -349,5 +518,119 @@ ${task.content}
         body: response.message?.content || 'Error generating email'
       };
     }
+  }
+
+  // Helper methods
+  private calculatePriority(email: GmailMessage): 'high' | 'medium' | 'low' {
+    const urgentWords = ['urgent', 'important', 'asap', 'deadline', 'emergency'];
+    const body = email.body.toLowerCase();
+    const subject = email.subject.toLowerCase();
+    
+    if (urgentWords.some(word => body.includes(word) || subject.includes(word))) {
+      return 'high';
+    }
+    
+    if (email.body.includes('?') || subject.includes('re:') || subject.includes('fwd:')) {
+      return 'medium';
+    }
+    
+    return 'low';
+  }
+
+  private categorizeEmail(email: GmailMessage): string {
+    const subject = email.subject.toLowerCase();
+    const body = email.body.toLowerCase();
+    const from = email.from.toLowerCase();
+    
+    if (from.includes('noreply') || from.includes('newsletter') || subject.includes('unsubscribe')) {
+      return 'newsletter';
+    }
+    
+    if (subject.includes('meeting') || subject.includes('calendar') || body.includes('schedule')) {
+      return 'meeting';
+    }
+    
+    if (subject.includes('urgent') || subject.includes('important')) {
+      return 'urgent';
+    }
+    
+    if (from.includes('.com') && (subject.includes('offer') || subject.includes('sale') || subject.includes('discount'))) {
+      return 'promotional';
+    }
+    
+    if (body.includes('work') || body.includes('project') || body.includes('business')) {
+      return 'work';
+    }
+    
+    return 'personal';
+  }
+
+  private getCategoryBreakdown(emails: GmailMessage[]): any {
+    const categories = {};
+    emails.forEach(email => {
+      const category = this.categorizeEmail(email);
+      categories[category] = (categories[category] || 0) + 1;
+    });
+    return categories;
+  }
+
+  private calculateAverageResponseTime(emails: GmailMessage[]): number {
+    // This would require tracking response times in a database
+    // For now, return a placeholder
+    return 24; // hours
+  }
+
+  private getTopSenders(emails: GmailMessage[]): any[] {
+    const senders = {};
+    emails.forEach(email => {
+      const domain = email.from.split('@')[1] || 'unknown';
+      senders[domain] = (senders[domain] || 0) + 1;
+    });
+    
+    return Object.entries(senders)
+      .map(([domain, count]) => ({ domain, count }))
+      .sort((a, b) => (b.count as number) - (a.count as number))
+      .slice(0, 10);
+  }
+
+  private getEmailsByHour(emails: GmailMessage[]): any[] {
+    const hours = {};
+    emails.forEach(email => {
+      const hour = email.date.getHours();
+      hours[hour] = (hours[hour] || 0) + 1;
+    });
+    
+    return Object.entries(hours)
+      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+      .sort((a, b) => a.hour - b.hour);
+  }
+
+  private getEmailsByDay(emails: GmailMessage[]): any[] {
+    const days = {};
+    emails.forEach(email => {
+      const day = email.date.toLocaleDateString('en-US', { weekday: 'long' });
+      days[day] = (days[day] || 0) + 1;
+    });
+    
+    return Object.entries(days)
+      .map(([day, count]) => ({ day, count }));
+  }
+
+  private isToday(date: Date): boolean {
+    const today = new Date();
+    return date.getDate() === today.getDate() && 
+           date.getMonth() === today.getMonth() && 
+           date.getFullYear() === today.getFullYear();
+  }
+
+  private isThisWeek(date: Date): boolean {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return date >= weekAgo;
+  }
+
+  private daysSince(date: Date): number {
+    const now = new Date();
+    return Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
   }
 } 

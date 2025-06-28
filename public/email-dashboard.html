@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📧 Advanced Email Management - Business Agent System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .email-card:hover { transform: translateY(-2px); }
+        .priority-high { border-left: 4px solid #ef4444; }
+        .priority-medium { border-left: 4px solid #f59e0b; }
+        .priority-low { border-left: 4px solid #10b981; }
+        .category-work { background-color: #dbeafe; }
+        .category-personal { background-color: #fef3c7; }
+        .category-newsletter { background-color: #f3e8ff; }
+        .category-promotional { background-color: #fecaca; }
+        .category-urgent { background-color: #fee2e2; }
+        .category-meeting { background-color: #dcfce7; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">📧 Advanced Email Management</h1>
+                    <p class="text-gray-600 mt-2">AI-powered inbox management and analytics</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="/" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                    <button onclick="refreshEmails()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gmail Connection Status -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-800">🔗 Gmail Connection</h2>
+                    <div id="gmailStatus" class="text-gray-600 mt-2">Checking connection...</div>
+                </div>
+                <div id="gmailActions" class="space-x-2">
+                    <button onclick="connectGmail()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fab fa-google mr-2"></i>Connect Gmail
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <i class="fas fa-inbox text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Emails</p>
+                        <p id="totalEmails" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-100 text-red-600">
+                        <i class="fas fa-exclamation-triangle text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Unread</p>
+                        <p id="unreadCount" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        <i class="fas fa-clock text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Today</p>
+                        <p id="todayCount" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                        <i class="fas fa-chart-line text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">This Week</p>
+                        <p id="weekCount" class="text-2xl font-bold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Email List -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">📬 Email Inbox</h2>
+                        <div class="flex space-x-2">
+                            <select id="priorityFilter" class="border rounded px-3 py-1 text-sm" onchange="filterEmails()">
+                                <option value="">All Priorities</option>
+                                <option value="high">High Priority</option>
+                                <option value="medium">Medium Priority</option>
+                                <option value="low">Low Priority</option>
+                            </select>
+                            <select id="categoryFilter" class="border rounded px-3 py-1 text-sm" onchange="filterEmails()">
+                                <option value="">All Categories</option>
+                                <option value="work">Work</option>
+                                <option value="personal">Personal</option>
+                                <option value="newsletter">Newsletter</option>
+                                <option value="promotional">Promotional</option>
+                                <option value="urgent">Urgent</option>
+                                <option value="meeting">Meeting</option>
+                            </select>
+                            <button onclick="selectAllEmails()" class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">
+                                Select All
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="emailList" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>No emails loaded. Connect Gmail to get started.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Bulk Actions -->
+                    <div id="bulkActions" class="hidden mt-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <span id="selectedCount" class="text-sm text-gray-600">0 emails selected</span>
+                            <div class="flex space-x-2">
+                                <button onclick="bulkAction('read')" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                                    <i class="fas fa-check mr-1"></i>Mark Read
+                                </button>
+                                <button onclick="bulkAction('archive')" class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">
+                                    <i class="fas fa-archive mr-1"></i>Archive
+                                </button>
+                                <button onclick="bulkAction('delete')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                                    <i class="fas fa-trash mr-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- AI Suggestions -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>AI Suggestions
+                    </h3>
+                    <div id="aiSuggestions" class="space-y-3">
+                        <div class="text-gray-500 text-sm">Loading suggestions...</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-bolt text-blue-500 mr-2"></i>Quick Actions
+                    </h3>
+                    <div class="space-y-3">
+                        <button onclick="showSendEmailForm()" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">
+                            <i class="fas fa-paper-plane mr-2"></i>Send Email
+                        </button>
+                        <button onclick="getEmailAnalytics()" class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600">
+                            <i class="fas fa-chart-bar mr-2"></i>View Analytics
+                        </button>
+                        <button onclick="searchEmails()" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
+                            <i class="fas fa-search mr-2"></i>Search Emails
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analytics Chart -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-chart-pie text-green-500 mr-2"></i>Priority Distribution
+                    </h3>
+                    <canvas id="priorityChart" width="300" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Detail Modal -->
+        <div id="emailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-xl font-semibold text-gray-800">Email Details</h3>
+                            <button onclick="closeEmailModal()" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <div id="emailModalContent">
+                            <!-- Email content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send Email Modal -->
+        <div id="sendEmailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg max-w-2xl w-full">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-xl font-semibold text-gray-800">Send Email</h3>
+                            <button onclick="closeSendEmailModal()" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <form id="sendEmailForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">To:</label>
+                                <input type="email" id="emailTo" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Subject:</label>
+                                <input type="text" id="emailSubject" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Message:</label>
+                                <textarea id="emailBody" rows="8" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" onclick="closeSendEmailModal()" class="px-4 py-2 text-gray-600 border rounded-lg hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                                    <i class="fas fa-paper-plane mr-2"></i>Send Email
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
+        let gmailAccessToken = null;
+        let emails = [];
+        let selectedEmails = new Set();
+        let priorityChart = null;
+
+        // Initialize dashboard
+        window.addEventListener('load', function() {
+            loadGmailToken();
+            checkGmailAuthCallback();
+            if (gmailAccessToken) {
+                refreshEmails();
+            }
+        });
+
+        // Gmail Integration Functions
+        function loadGmailToken() {
+            const savedToken = localStorage.getItem('gmailAccessToken');
+            if (savedToken) {
+                gmailAccessToken = savedToken;
+                updateGmailStatus(true, 'Gmail connected (from saved session)');
+                return true;
+            }
+            return false;
+        }
+
+        function saveGmailToken(token) {
+            gmailAccessToken = token;
+            localStorage.setItem('gmailAccessToken', token);
+        }
+
+        function clearGmailToken() {
+            gmailAccessToken = null;
+            localStorage.removeItem('gmailAccessToken');
+        }
+
+        function connectGmail() {
+            fetch(`${API_BASE}/api/auth/gmail`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.authUrl;
+                    } else {
+                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
+                });
+        }
+
+        function checkGmailAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gmailAuth = urlParams.get('gmail_auth');
+            
+            if (gmailAuth === 'success') {
+                const accessToken = urlParams.get('access_token');
+                if (accessToken) {
+                    saveGmailToken(accessToken);
+                    updateGmailStatus(true, 'Gmail connected successfully!');
+                    
+                    // Clean up URL parameters
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                    
+                    // Refresh emails
+                    refreshEmails();
+                }
+            } else if (gmailAuth === 'error') {
+                const error = urlParams.get('error');
+                updateGmailStatus(false, 'Gmail authentication failed: ' + (error || 'Unknown error'));
+                
+                // Clean up URL parameters
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
+        function updateGmailStatus(connected, message) {
+            const statusDiv = document.getElementById('gmailStatus');
+            const actionsDiv = document.getElementById('gmailActions');
+            
+            if (connected) {
+                statusDiv.innerHTML = `<span class="text-green-600">✅ ${message}</span>`;
+                actionsDiv.innerHTML = `
+                    <button onclick="disconnectGmail()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        <i class="fas fa-unlink mr-2"></i>Disconnect
+                    </button>
+                `;
+            } else {
+                statusDiv.innerHTML = `<span class="text-red-600">❌ ${message}</span>`;
+                actionsDiv.innerHTML = `
+                    <button onclick="connectGmail()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fab fa-google mr-2"></i>Connect Gmail
+                    </button>
+                `;
+            }
+        }
+
+        function disconnectGmail() {
+            clearGmailToken();
+            updateGmailStatus(false, 'Gmail disconnected');
+            emails = [];
+            selectedEmails.clear();
+            updateEmailList();
+            updateStats();
+        }
+
+        // Email Management Functions
+        async function refreshEmails() {
+            if (!gmailAccessToken) {
+                alert('Please connect Gmail first');
+                return;
+            }
+
+            try {
+                const result = await apiCall('/api/gmail/check-emails', 'POST', {
+                    accessToken: gmailAccessToken
+                });
+
+                if (result.status === 'success') {
+                    emails = result.result.recentEmails || [];
+                    updateEmailList();
+                    updateStats();
+                    updateAnalytics();
+                    generateAISuggestions();
+                } else {
+                    alert('Failed to refresh emails: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error refreshing emails: ' + error.message);
+            }
+        }
+
+        function updateEmailList() {
+            const emailListDiv = document.getElementById('emailList');
+            
+            if (emails.length === 0) {
+                emailListDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-inbox text-4xl mb-4"></i>
+                        <p>No emails found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const filteredEmails = filterEmailsByCriteria(emails);
+            
+            emailListDiv.innerHTML = filteredEmails.map(email => `
+                <div class="email-card bg-white border rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer priority-${email.priority || 'medium'} category-${email.category || 'personal'}" 
+                     onclick="openEmailModal('${email.id}')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <input type="checkbox" class="email-checkbox" 
+                                       onchange="toggleEmailSelection('${email.id}', this.checked)"
+                                       ${selectedEmails.has(email.id) ? 'checked' : ''}>
+                                <span class="font-medium text-gray-900">${email.from}</span>
+                                <span class="text-xs px-2 py-1 rounded-full ${
+                                    email.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                    email.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-green-100 text-green-800'
+                                }">${email.priority || 'medium'}</span>
+                                <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">${email.category || 'personal'}</span>
+                            </div>
+                            <h3 class="font-semibold text-gray-800 mb-1">${email.subject}</h3>
+                            <p class="text-sm text-gray-600 mb-2">${email.preview || email.body.substring(0, 100)}...</p>
+                            <div class="flex items-center justify-between text-xs text-gray-500">
+                                <span>${new Date(email.date).toLocaleDateString()}</span>
+                                ${!email.isRead ? '<span class="bg-blue-500 text-white px-2 py-1 rounded-full">Unread</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex space-x-2 ml-4">
+                            <button onclick="event.stopPropagation(); markAsRead('${email.id}')" 
+                                    class="text-blue-500 hover:text-blue-700">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); generateAIReply('${email.id}')" 
+                                    class="text-green-500 hover:text-green-700">
+                                <i class="fas fa-reply"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteEmail('${email.id}')" 
+                                    class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterEmailsByCriteria(emailList) {
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            
+            return emailList.filter(email => {
+                const priorityMatch = !priorityFilter || email.priority === priorityFilter;
+                const categoryMatch = !categoryFilter || email.category === categoryFilter;
+                return priorityMatch && categoryMatch;
+            });
+        }
+
+        function filterEmails() {
+            updateEmailList();
+        }
+
+        function toggleEmailSelection(emailId, checked) {
+            if (checked) {
+                selectedEmails.add(emailId);
+            } else {
+                selectedEmails.delete(emailId);
+            }
+            updateBulkActions();
+        }
+
+        function selectAllEmails() {
+            const checkboxes = document.querySelectorAll('.email-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                const emailId = checkbox.getAttribute('onchange').match(/'([^']+)'/)[1];
+                toggleEmailSelection(emailId, !allChecked);
+            });
+        }
+
+        function updateBulkActions() {
+            const bulkActionsDiv = document.getElementById('bulkActions');
+            const selectedCountSpan = document.getElementById('selectedCount');
+            
+            if (selectedEmails.size > 0) {
+                bulkActionsDiv.classList.remove('hidden');
+                selectedCountSpan.textContent = `${selectedEmails.size} emails selected`;
+            } else {
+                bulkActionsDiv.classList.add('hidden');
+            }
+        }
+
+        async function bulkAction(action) {
+            if (selectedEmails.size === 0) {
+                alert('Please select emails first');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to ${action} ${selectedEmails.size} emails?`)) {
+                return;
+            }
+
+            try {
+                const result = await apiCall('/api/gmail/bulk-action', 'POST', {
+                    accessToken: gmailAccessToken,
+                    emailIds: Array.from(selectedEmails),
+                    action: action
+                });
+
+                if (result.status === 'success') {
+                    alert(`Successfully processed ${result.successful} emails. ${result.failed} failed.`);
+                    selectedEmails.clear();
+                    updateBulkActions();
+                    refreshEmails();
+                } else {
+                    alert('Bulk action failed: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error performing bulk action: ' + error.message);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalEmails').textContent = emails.length;
+            document.getElementById('unreadCount').textContent = emails.filter(e => !e.isRead).length;
+            document.getElementById('todayCount').textContent = emails.filter(e => isToday(new Date(e.date))).length;
+            document.getElementById('weekCount').textContent = emails.filter(e => isThisWeek(new Date(e.date))).length;
+        }
+
+        function updateAnalytics() {
+            const priorityBreakdown = {
+                high: emails.filter(e => e.priority === 'high').length,
+                medium: emails.filter(e => e.priority === 'medium').length,
+                low: emails.filter(e => e.priority === 'low').length
+            };
+
+            if (priorityChart) {
+                priorityChart.destroy();
+            }
+
+            const ctx = document.getElementById('priorityChart').getContext('2d');
+            priorityChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['High Priority', 'Medium Priority', 'Low Priority'],
+                    datasets: [{
+                        data: [priorityBreakdown.high, priorityBreakdown.medium, priorityBreakdown.low],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        async function generateAISuggestions() {
+            if (emails.length === 0) return;
+
+            try {
+                const result = await apiCall('/api/gmail/ai-suggestions', 'POST', {
+                    accessToken: gmailAccessToken,
+                    emails: emails
+                });
+
+                if (result.status === 'success') {
+                    const suggestionsDiv = document.getElementById('aiSuggestions');
+                    suggestionsDiv.innerHTML = result.suggestions.map(suggestion => `
+                        <div class="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                            <p class="text-sm text-gray-700">${suggestion}</p>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error generating AI suggestions:', error);
+            }
+        }
+
+        // Email Actions
+        async function markAsRead(emailId) {
+            try {
+                const result = await apiCall('/api/gmail/mark-read', 'POST', {
+                    accessToken: gmailAccessToken,
+                    emailId: emailId
+                });
+
+                if (result.status === 'success') {
+                    refreshEmails();
+                } else {
+                    alert('Failed to mark email as read: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error marking email as read: ' + error.message);
+            }
+        }
+
+        async function deleteEmail(emailId) {
+            if (!confirm('Are you sure you want to delete this email?')) {
+                return;
+            }
+
+            try {
+                const result = await apiCall('/api/gmail/delete-email', 'POST', {
+                    accessToken: gmailAccessToken,
+                    emailId: emailId
+                });
+
+                if (result.status === 'success') {
+                    refreshEmails();
+                } else {
+                    alert('Failed to delete email: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error deleting email: ' + error.message);
+            }
+        }
+
+        async function generateAIReply(emailId) {
+            try {
+                const result = await apiCall('/api/gmail/ai-reply', 'POST', {
+                    accessToken: gmailAccessToken,
+                    emailId: emailId,
+                    replyType: 'quick'
+                });
+
+                if (result.status === 'success') {
+                    alert('AI Reply Generated:\n\n' + result.reply.body);
+                } else {
+                    alert('Failed to generate AI reply: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error generating AI reply: ' + error.message);
+            }
+        }
+
+        // Modal Functions
+        function openEmailModal(emailId) {
+            const email = emails.find(e => e.id === emailId);
+            if (!email) return;
+
+            const modalContent = document.getElementById('emailModalContent');
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="border-b pb-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="font-medium">From:</span>
+                            <span>${email.from}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="font-medium">Subject:</span>
+                            <span>${email.subject}</span>
+                        </div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="font-medium">Date:</span>
+                            <span>${new Date(email.date).toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="prose max-w-none">
+                        <p class="whitespace-pre-wrap">${email.body}</p>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4 border-t">
+                        <button onclick="generateAIReply('${email.id}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                            <i class="fas fa-reply mr-2"></i>Generate Reply
+                        </button>
+                        <button onclick="markAsRead('${email.id}')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            <i class="fas fa-check mr-2"></i>Mark Read
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('emailModal').classList.remove('hidden');
+        }
+
+        function closeEmailModal() {
+            document.getElementById('emailModal').classList.add('hidden');
+        }
+
+        function showSendEmailForm() {
+            document.getElementById('sendEmailModal').classList.remove('hidden');
+        }
+
+        function closeSendEmailModal() {
+            document.getElementById('sendEmailModal').classList.add('hidden');
+            document.getElementById('sendEmailForm').reset();
+        }
+
+        // Form submission
+        document.getElementById('sendEmailForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const to = document.getElementById('emailTo').value;
+            const subject = document.getElementById('emailSubject').value;
+            const body = document.getElementById('emailBody').value;
+
+            try {
+                const result = await apiCall('/api/gmail/send-email', 'POST', {
+                    accessToken: gmailAccessToken,
+                    to: to,
+                    subject: subject,
+                    content: body
+                });
+
+                if (result.status === 'success') {
+                    alert('Email sent successfully!');
+                    closeSendEmailModal();
+                } else {
+                    alert('Failed to send email: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error sending email: ' + error.message);
+            }
+        });
+
+        // Utility Functions
+        function isToday(date) {
+            const today = new Date();
+            return date.getDate() === today.getDate() && 
+                   date.getMonth() === today.getMonth() && 
+                   date.getFullYear() === today.getFullYear();
+        }
+
+        function isThisWeek(date) {
+            const now = new Date();
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return date >= weekAgo;
+        }
+
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const config = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                if (data) {
+                    config.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, config);
+                return await response.json();
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target.id === 'emailModal') {
+                closeEmailModal();
+            }
+            if (e.target.id === 'sendEmailModal') {
+                closeSendEmailModal();
+            }
+        });
+    </script>
+</body>
+</html> 
