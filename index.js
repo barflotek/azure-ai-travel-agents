@@ -4,10 +4,14 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const path = require('path');
 const fs = require('fs');
+const KnowledgeService = require('./ragflow-knowledge');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize RAGFlow knowledge service
+const knowledgeService = new KnowledgeService();
 
 // Middleware
 app.use(cors());
@@ -129,7 +133,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Knowledge base endpoints
+// Knowledge base endpoints - NOW USING RAGFLOW!
 app.post('/api/knowledge/upload', upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
@@ -139,9 +143,10 @@ app.post('/api/knowledge/upload', upload.single('pdf'), async (req, res) => {
       });
     }
 
-    console.log(`Processing PDF: ${req.file.originalname}`);
+    console.log(`📄 Processing PDF: ${req.file.originalname}`);
     
-    // Parse PDF
+    // For now, keep the old system for upload tracking
+    // In the future, we can integrate with RAGFlow's upload API
     const pdfData = await pdfParse(req.file.buffer);
     const text = pdfData.text;
     
@@ -180,7 +185,7 @@ app.post('/api/knowledge/upload', upload.single('pdf'), async (req, res) => {
     
     documents.push(document);
     
-    console.log(`Successfully processed ${req.file.originalname}: ${chunks.length} chunks`);
+    console.log(`✅ Successfully processed ${req.file.originalname}: ${chunks.length} chunks`);
     
     res.json({
       success: true,
@@ -210,41 +215,58 @@ app.post('/api/knowledge/ask', async (req, res) => {
       });
     }
     
-    if (knowledgeBase.length === 0) {
-      return res.json({
+    console.log(`🤖 Knowledge Agent: Processing question: "${question}"`);
+    
+    // Use RAGFlow for intelligent answers
+    const result = await knowledgeService.askQuestion(question);
+    
+    if (result.success) {
+      res.json({
         success: true,
-        answer: "I don't have any knowledge yet. Please upload some PDF documents first so I can help answer your questions.",
-        sources: [],
-        confidence: 'none'
+        answer: result.answer,
+        sources: result.sources,
+        citations: result.citations,
+        confidence: result.confidence,
+        foundChunks: result.sources?.length || 0
+      });
+    } else {
+      // Fallback to old system if RAGFlow fails
+      if (knowledgeBase.length === 0) {
+        return res.json({
+          success: true,
+          answer: "I don't have any knowledge yet. Please upload some PDF documents first so I can help answer your questions.",
+          sources: [],
+          confidence: 'none'
+        });
+      }
+      
+      // Search for relevant chunks
+      const relevantChunks = simpleSearch(question, knowledgeBase, 5);
+      
+      if (relevantChunks.length === 0) {
+        return res.json({
+          success: true,
+          answer: "I couldn't find relevant information in the uploaded documents to answer your question.",
+          sources: [],
+          confidence: 'low'
+        });
+      }
+      
+      // Generate response (placeholder - integrate with actual LLM)
+      const context = relevantChunks.map(chunk => chunk.content).join('\n\n');
+      const answer = `Based on your uploaded documents, here's what I found:\n\n${context.substring(0, 500)}...\n\n[Note: This is a basic response. RAGFlow integration is being set up.]`;
+      
+      res.json({
+        success: true,
+        answer,
+        sources: relevantChunks.map(chunk => ({
+          filename: chunk.filename,
+          excerpt: chunk.content.substring(0, 100) + '...'
+        })),
+        confidence: relevantChunks.length >= 3 ? 'high' : 'medium',
+        foundChunks: relevantChunks.length
       });
     }
-    
-    // Search for relevant chunks
-    const relevantChunks = simpleSearch(question, knowledgeBase, 5);
-    
-    if (relevantChunks.length === 0) {
-      return res.json({
-        success: true,
-        answer: "I couldn't find relevant information in the uploaded documents to answer your question.",
-        sources: [],
-        confidence: 'low'
-      });
-    }
-    
-    // Generate response (placeholder - integrate with actual LLM)
-    const context = relevantChunks.map(chunk => chunk.content).join('\n\n');
-    const answer = `Based on your uploaded documents, here's what I found:\n\n${context.substring(0, 500)}...\n\n[Note: This is a basic response. Integrate with OpenAI/Groq for better answers.]`;
-    
-    res.json({
-      success: true,
-      answer,
-      sources: relevantChunks.map(chunk => ({
-        filename: chunk.filename,
-        excerpt: chunk.content.substring(0, 100) + '...'
-      })),
-      confidence: relevantChunks.length >= 3 ? 'high' : 'medium',
-      foundChunks: relevantChunks.length
-    });
     
   } catch (error) {
     console.error('Ask error:', error);
@@ -288,20 +310,49 @@ app.post('/api/knowledge/search', async (req, res) => {
   }
 });
 
-app.get('/api/knowledge/status', (req, res) => {
-  res.json({
-    success: true,
-    status: 'operational',
-    knowledgeBase: {
-      totalDocuments: documents.length,
-      totalChunks: knowledgeBase.length,
-      documents: documents.map(doc => ({
-        filename: doc.filename,
-        chunkCount: doc.chunkCount,
-        uploadedAt: doc.uploadedAt
-      }))
+app.get('/api/knowledge/status', async (req, res) => {
+  try {
+    // Try to get RAGFlow status first
+    const ragflowStatus = await knowledgeService.getKnowledgeBaseStatus();
+    
+    if (ragflowStatus.success) {
+      res.json({
+        success: true,
+        status: 'operational',
+        knowledgeBase: {
+          totalDocuments: ragflowStatus.totalDocuments,
+          totalChunks: knowledgeBase.length, // Keep old system count for now
+          documents: documents.map(doc => ({
+            filename: doc.filename,
+            chunkCount: doc.chunkCount,
+            uploadedAt: doc.uploadedAt
+          })),
+          ragflowStatus: ragflowStatus.status
+        }
+      });
+    } else {
+      // Fallback to old system
+      res.json({
+        success: true,
+        status: 'operational',
+        knowledgeBase: {
+          totalDocuments: documents.length,
+          totalChunks: knowledgeBase.length,
+          documents: documents.map(doc => ({
+            filename: doc.filename,
+            chunkCount: doc.chunkCount,
+            uploadedAt: doc.uploadedAt
+          })),
+          ragflowStatus: 'fallback'
+        }
+      });
     }
-  });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 app.get('/api/knowledge/documents', (req, res) => {
