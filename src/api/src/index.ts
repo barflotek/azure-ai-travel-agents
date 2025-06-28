@@ -19,8 +19,22 @@ app.use(cors());
 app.use(express.json());
 
 // Knowledge routes
-const knowledgeRoutes = require('../../routes/knowledge-routes');
-app.use('/api/knowledge', knowledgeRoutes);
+try {
+  const knowledgeRoutes = require('../../routes/knowledge-routes');
+  app.use('/api/knowledge', knowledgeRoutes);
+  console.log('Knowledge routes loaded successfully');
+} catch (error) {
+  console.error('Failed to load knowledge routes:', error);
+}
+
+// Test knowledge route
+app.get('/api/knowledge/test', (req, res) => {
+  res.json({ 
+    status: 'success', 
+    message: 'Knowledge routes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Health check endpoint
 app.get('/', (req, res) => {
