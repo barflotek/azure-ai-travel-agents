@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📧 Superhuman Email Interface - Business Agent System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Superhuman-style animations and effects */
+        .email-item {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            contain: layout style paint;
+        }
+        
+        .email-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .email-item.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .priority-high { border-left: 3px solid #ef4444; }
+        .priority-medium { border-left: 3px solid #f59e0b; }
+        .priority-low { border-left: 3px solid #10b981; }
+        
+        .command-palette {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        
+        .dark .command-palette {
+            background: rgba(17, 24, 39, 0.95);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.8);
+        }
+        
+        .skeleton {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Performance optimizations */
+        * { 
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        
+        .email-list-container {
+            contain: layout style;
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <!-- Command Palette -->
+    <div id="commandPalette" class="fixed inset-0 z-50 flex items-start justify-center pt-20 hidden">
+        <div class="command-palette rounded-xl shadow-2xl w-full max-w-2xl mx-4">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input id="commandInput" type="text" placeholder="Search emails, compose, or use commands..." 
+                           class="flex-1 bg-transparent outline-none text-gray-900 dark:text-white placeholder-gray-500">
+                </div>
+            </div>
+            <div id="commandResults" class="max-h-96 overflow-y-auto">
+                <!-- Command results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-8">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Superhuman Email</h1>
+                    </div>
+                    
+                    <!-- Category Tabs -->
+                    <nav class="flex space-x-1">
+                        <button onclick="switchCategory(0)" class="category-tab active px-3 py-2 text-sm font-medium rounded-md">
+                            All
+                        </button>
+                        <button onclick="switchCategory(1)" class="category-tab px-3 py-2 text-sm font-medium rounded-md">
+                            Unread
+                        </button>
+                        <button onclick="switchCategory(2)" class="category-tab px-3 py-2 text-sm font-medium rounded-md">
+                            Important
+                        </button>
+                        <button onclick="switchCategory(3)" class="category-tab px-3 py-2 text-sm font-medium rounded-md">
+                            Work
+                        </button>
+                        <button onclick="switchCategory(4)" class="category-tab px-3 py-2 text-sm font-medium rounded-md">
+                            Personal
+                        </button>
+                    </nav>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <button onclick="openCommandPalette()" class="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <span>⌘K</span>
+                    </button>
+                    
+                    <!-- Compose -->
+                    <button onclick="openCompose()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Compose
+                    </button>
+                    
+                    <!-- Dark mode toggle -->
+                    <button id="darkModeToggle" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+                    
+                    <!-- Back to main dashboard -->
+                    <a href="/" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex h-screen bg-white dark:bg-gray-900">
+        <!-- Email List -->
+        <div class="w-1/2 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <!-- Email List Header -->
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white" id="categoryTitle">All Emails</h2>
+                        <span id="unreadBadge" class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">0</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="refreshEmails()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Email List Container -->
+            <div id="emailListContainer" class="flex-1 overflow-y-auto custom-scrollbar">
+                <!-- Emails will be populated here -->
+            </div>
+        </div>
+        
+        <!-- Email Detail -->
+        <div class="w-1/2 flex flex-col">
+            <div id="emailDetail" class="flex-1 flex flex-col">
+                <!-- Placeholder when no email is selected -->
+                <div class="flex-1 flex items-center justify-center">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="text-gray-500 dark:text-gray-400">Select an email to view</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        
+        // State
+        let emails = [];
+        let currentEmailIndex = 0;
+        let selectedEmail = null;
+        let currentCategory = 0;
+        let filteredEmails = [];
+        
+        // Categories
+        const categories = [
+            { name: 'All Emails', filter: () => emails },
+            { name: 'Unread', filter: () => emails.filter(e => !e.isRead) },
+            { name: 'Important', filter: () => emails.filter(e => e.priority === 'high') },
+            { name: 'Work', filter: () => emails.filter(e => e.category === 'work') },
+            { name: 'Personal', filter: () => emails.filter(e => e.category === 'personal') }
+        ];
+
+        // Initialize the interface
+        function initializeSupermanInterface() {
+            setupKeyboardShortcuts();
+            setupCommandPalette();
+            setupDarkMode();
+            loadEmails();
+            
+            // Set up category tab styles
+            updateCategoryTabs();
+        }
+
+        // Load emails from API
+        async function loadEmails() {
+            try {
+                showEmailListSkeleton();
+                
+                const response = await fetch(`${API_BASE}/api/gmail/emails`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    emails = data.emails || [];
+                    filteredEmails = categories[currentCategory].filter();
+                    renderEmailList();
+                    updateStats();
+                } else {
+                    showErrorState();
+                }
+            } catch (error) {
+                console.error('Error loading emails:', error);
+                showErrorState();
+            }
+        }
+
+        // Render email list
+        function renderEmailList() {
+            const container = document.getElementById('emailListContainer');
+            
+            if (filteredEmails.length === 0) {
+                container.innerHTML = `
+                    <div class="flex-1 flex items-center justify-center">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                            <p class="text-gray-500 dark:text-gray-400">No emails found</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filteredEmails.map((email, index) => `
+                <div class="email-item p-4 border-b border-gray-100 dark:border-gray-700 cursor-pointer ${getPriorityClass(email.priority)} ${index === currentEmailIndex ? 'selected' : ''}" 
+                     data-index="${index}" onclick="selectEmail(${index})">
+                    <div class="flex items-start space-x-3">
+                        <div class="flex-shrink-0">
+                            ${getPriorityBadge(email.priority)}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    ${getSenderName(email.from)}
+                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    ${formatTime(email.date)}
+                                </p>
+                            </div>
+                            <p class="text-sm text-gray-900 dark:text-white font-medium truncate">
+                                ${email.subject}
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                ${email.snippet || ''}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Select email
+        function selectEmail(index) {
+            currentEmailIndex = index;
+            selectedEmail = filteredEmails[index];
+            
+            // Update UI
+            document.querySelectorAll('.email-item').forEach(item => item.classList.remove('selected'));
+            document.querySelector(`[data-index="${index}"]`)?.classList.add('selected');
+            
+            renderEmailDetail();
+        }
+
+        // Render email detail
+        function renderEmailDetail() {
+            if (!selectedEmail) return;
+            
+            const container = document.getElementById('emailDetail');
+            container.innerHTML = `
+                <div class="flex flex-col h-full">
+                    <!-- Email Header -->
+                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                    ${selectedEmail.subject}
+                                </h2>
+                                <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <span>From: ${selectedEmail.from}</span>
+                                    <span>${formatFullDate(selectedEmail.date)}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="replyToEmail()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" title="Reply (R)">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="archiveEmail()" class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" title="Archive (E)">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="deleteEmail()" class="p-2 text-red-600 hover:text-red-800" title="Delete (Delete)">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Summary -->
+                        ${selectedEmail.summary ? `
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 mt-4">
+                                <div class="flex items-start space-x-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">AI Summary</h3>
+                                        <p class="text-sm text-gray-700 dark:text-gray-300">${selectedEmail.summary}</p>
+                                        ${selectedEmail.requiresAction ? '<p class="text-xs text-orange-600 font-medium mt-2">⚡ Action required</p>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Email Content -->
+                    <div class="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                        <div class="email-content prose max-w-none dark:prose-invert">
+                            ${formatEmailBody(selectedEmail.body)}
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Reply -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 p-4">
+                        <div class="flex items-center space-x-3">
+                            <button onclick="quickReply('positive')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                                Quick Reply
+                            </button>
+                            <button onclick="generateAIReply()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                                AI Reply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Keyboard shortcuts (Superhuman-style)
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if typing in input fields
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                
+                switch(e.key.toLowerCase()) {
+                    case 'j':
+                    case 'arrowdown':
+                        e.preventDefault();
+                        navigateEmail('down');
+                        break;
+                    case 'k':
+                    case 'arrowup':
+                        e.preventDefault();
+                        navigateEmail('up');
+                        break;
+                    case 'r':
+                        if (!e.metaKey && !e.ctrlKey) {
+                            e.preventDefault();
+                            replyToEmail();
+                        }
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        archiveEmail();
+                        break;
+                    case 'delete':
+                    case 'backspace':
+                        e.preventDefault();
+                        deleteEmail();
+                        break;
+                    case 'c':
+                        if (!e.metaKey && !e.ctrlKey) {
+                            e.preventDefault();
+                            openCompose();
+                        }
+                        break;
+                    case 'enter':
+                        e.preventDefault();
+                        if (emails[currentEmailIndex]) {
+                            selectEmail(currentEmailIndex);
+                        }
+                        break;
+                    case 'escape':
+                        e.preventDefault();
+                        closeCommandPalette();
+                        break;
+                }
+                
+                // Command+K for search
+                if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                    e.preventDefault();
+                    openCommandPalette();
+                }
+                
+                // Number keys for categories
+                if (e.key >= '1' && e.key <= '5' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    switchCategory(parseInt(e.key) - 1);
+                }
+            });
+        }
+
+        // Navigate between emails
+        function navigateEmail(direction) {
+            if (direction === 'down' && currentEmailIndex < filteredEmails.length - 1) {
+                currentEmailIndex++;
+            } else if (direction === 'up' && currentEmailIndex > 0) {
+                currentEmailIndex--;
+            }
+            
+            selectEmail(currentEmailIndex);
+            scrollToCurrentEmail();
+        }
+
+        // Scroll to current email in list
+        function scrollToCurrentEmail() {
+            const emailItem = document.querySelector(`[data-index="${currentEmailIndex}"]`);
+            if (emailItem) {
+                emailItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // Command palette
+        function setupCommandPalette() {
+            const commandInput = document.getElementById('commandInput');
+            
+            commandInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                searchCommands(query);
+            });
+            
+            commandInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeCommandPalette();
+                }
+            });
+        }
+
+        function openCommandPalette() {
+            document.getElementById('commandPalette').classList.remove('hidden');
+            document.getElementById('commandInput').focus();
+        }
+
+        function closeCommandPalette() {
+            document.getElementById('commandPalette').classList.add('hidden');
+            document.getElementById('commandInput').value = '';
+        }
+
+        function searchCommands(query) {
+            const results = document.getElementById('commandResults');
+            
+            if (!query) {
+                results.innerHTML = `
+                    <div class="p-4 text-sm text-gray-500 dark:text-gray-400">
+                        Type to search emails, compose, or use commands...
+                    </div>
+                `;
+                return;
+            }
+            
+            // Simple command search - you can expand this
+            const commands = [
+                { name: 'Compose Email', action: () => openCompose() },
+                { name: 'Refresh Emails', action: () => loadEmails() },
+                { name: 'Switch to Unread', action: () => switchCategory(1) },
+                { name: 'Switch to Important', action: () => switchCategory(2) }
+            ];
+            
+            const filteredCommands = commands.filter(cmd => 
+                cmd.name.toLowerCase().includes(query)
+            );
+            
+            results.innerHTML = filteredCommands.map(cmd => `
+                <div class="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" onclick="closeCommandPalette(); ${cmd.action.toString()}()">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">${cmd.name}</div>
+                </div>
+            `).join('');
+        }
+
+        // Category switching
+        function switchCategory(index) {
+            currentCategory = index;
+            filteredEmails = categories[index].filter();
+            currentEmailIndex = 0;
+            selectedEmail = null;
+            
+            document.getElementById('categoryTitle').textContent = categories[index].name;
+            updateCategoryTabs();
+            renderEmailList();
+            renderEmailDetail();
+        }
+
+        function updateCategoryTabs() {
+            document.querySelectorAll('.category-tab').forEach((tab, index) => {
+                if (index === currentCategory) {
+                    tab.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-300');
+                    tab.classList.remove('text-gray-600', 'dark:text-gray-300', 'hover:text-gray-900', 'dark:hover:text-white');
+                } else {
+                    tab.classList.remove('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-300');
+                    tab.classList.add('text-gray-600', 'dark:text-gray-300', 'hover:text-gray-900', 'dark:hover:text-white');
+                }
+            });
+        }
+
+        // Dark mode toggle
+        function setupDarkMode() {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const html = document.documentElement;
+            
+            darkModeToggle.addEventListener('click', () => {
+                html.classList.toggle('dark');
+                localStorage.setItem('darkMode', html.classList.contains('dark'));
+            });
+            
+            // Load saved preference
+            if (localStorage.getItem('darkMode') === 'true') {
+                html.classList.add('dark');
+            }
+        }
+
+        // Utility functions
+        function getPriorityClass(priority) {
+            switch(priority) {
+                case 'high': return 'priority-high';
+                case 'medium': return 'priority-medium';
+                case 'low': return 'priority-low';
+                default: return '';
+            }
+        }
+
+        function getPriorityBadge(priority) {
+            if (priority === 'high') {
+                return '<span class="w-2 h-2 bg-red-500 rounded-full" title="High priority"></span>';
+            }
+            return '';
+        }
+
+        function getSenderName(email) {
+            // Extract name from "Name <email@domain.com>" format
+            const match = email.match(/^(.+?)\s*<.*>$/);
+            return match ? match[1].trim() : email.split('@')[0];
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) return 'Today';
+            if (diffDays === 2) return 'Yesterday';
+            if (diffDays <= 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function formatFullDate(dateString) {
+            return new Date(dateString).toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatEmailBody(body) {
+            if (!body) return '<p class="text-gray-500 dark:text-gray-400 italic">No content available</p>';
+            
+            // Convert plain text to HTML with proper formatting
+            return body
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>')
+                .replace(/^/, '<p>')
+                .replace(/$/, '</p>')
+                .replace(/(<p><\/p>)/g, '');
+        }
+
+        // Loading states
+        function showEmailListSkeleton() {
+            const container = document.getElementById('emailListContainer');
+            const skeletonItems = Array(8).fill(0).map(() => `
+                <div class="p-4 border-b border-gray-100 dark:border-gray-700">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-2 h-2 bg-gray-200 dark:bg-gray-600 rounded-full mt-1 skeleton"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-4 bg-gray-200 dark:bg-gray-600 rounded skeleton w-1/3"></div>
+                            <div class="h-3 bg-gray-200 dark:bg-gray-600 rounded skeleton w-3/4"></div>
+                            <div class="h-3 bg-gray-200 dark:bg-gray-600 rounded skeleton w-1/2"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = skeletonItems;
+        }
+
+        function showErrorState() {
+            const container = document.getElementById('emailListContainer');
+            container.innerHTML = `
+                <div class="flex-1 flex items-center justify-center">
+                    <div class="text-center">
+                        <svg class="w-12 h-12 text-red-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">Failed to load emails</p>
+                        <button onclick="loadEmails()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Try again</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateStats() {
+            const unreadCount = emails.filter(email => !email.isRead).length;
+            document.getElementById('unreadBadge').textContent = unreadCount;
+        }
+
+        // Email actions
+        async function replyToEmail() {
+            if (!selectedEmail) return;
+            
+            // Generate AI reply
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/ai-reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        emailId: selectedEmail.id,
+                        replyType: 'quick'
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showComposeModal(result.data);
+                }
+            } catch (error) {
+                console.error('Error generating reply:', error);
+            }
+        }
+
+        async function archiveEmail() {
+            if (!selectedEmail) return;
+            
+            // Implement archive functionality
+            console.log('Archiving email:', selectedEmail.id);
+            
+            // Remove from current view with animation
+            const emailItem = document.querySelector(`[data-index="${currentEmailIndex}"]`);
+            if (emailItem) {
+                emailItem.style.transform = 'translateX(100%)';
+                emailItem.style.opacity = '0';
+                setTimeout(() => {
+                    filteredEmails.splice(currentEmailIndex, 1);
+                    renderEmailList();
+                    if (currentEmailIndex >= filteredEmails.length) {
+                        currentEmailIndex = Math.max(0, filteredEmails.length - 1);
+                    }
+                    if (filteredEmails[currentEmailIndex]) {
+                        selectEmail(currentEmailIndex);
+                    }
+                }, 200);
+            }
+        }
+
+        async function deleteEmail() {
+            if (!selectedEmail) return;
+            
+            // Show confirmation
+            if (confirm('Delete this email? This action cannot be undone.')) {
+                console.log('Deleting email:', selectedEmail.id);
+                archiveEmail(); // Same animation for now
+            }
+        }
+
+        function quickReply(type) {
+            const replies = {
+                positive: "Thank you for your email. I'll review this and get back to you shortly.",
+                neutral: "Thank you for reaching out. I've received your message and will respond accordingly.",
+                schedule: "Thank you for your email. I'd be happy to schedule a time to discuss this further."
+            };
+            
+            showComposeModal({
+                subject: `Re: ${selectedEmail.subject}`,
+                body: replies[type] || replies.neutral,
+                to: selectedEmail.from
+            });
+        }
+
+        async function generateAIReply() {
+            if (!selectedEmail) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/ai-reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        emailId: selectedEmail.id,
+                        replyType: 'detailed'
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showComposeModal(result.data);
+                }
+            } catch (error) {
+                console.error('Error generating AI reply:', error);
+            }
+        }
+
+        function openCompose() {
+            showComposeModal();
+        }
+
+        function showComposeModal(data = {}) {
+            // Create and show compose modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Compose Email</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
+                            <input type="email" value="${data.to || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+                            <input type="text" value="${data.subject || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
+                            <textarea rows="8" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">${data.body || ''}</textarea>
+                        </div>
+                        <div class="flex justify-between items-center pt-4">
+                            <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                                🤖 AI Enhance
+                            </button>
+                            <div class="space-x-3">
+                                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100">
+                                    Cancel
+                                </button>
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function refreshEmails() {
+            loadEmails();
+        }
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', initializeSupermanInterface);
+    </script>
+</body>
+</html> 

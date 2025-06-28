@@ -27,6 +27,9 @@ app.get('/', (req, res) => {
         <a href="/email-dashboard" style="display: inline-block; margin: 10px; padding: 15px 30px; background: #3B82F6; color: white; text-decoration: none; border-radius: 8px;">
           📧 Advanced Email Management
         </a>
+        <a href="/email-superhuman" style="display: inline-block; margin: 10px; padding: 15px 30px; background: #8B5CF6; color: white; text-decoration: none; border-radius: 8px;">
+          ⚡ Superhuman Email Interface
+        </a>
         <a href="/index.html" style="display: inline-block; margin: 10px; padding: 15px 30px; background: #10B981; color: white; text-decoration: none; border-radius: 8px;">
           🎯 Agent Dashboard
         </a>
@@ -517,6 +520,11 @@ app.get('/email-dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/email-dashboard.html'));
 });
 
+// Serve the Superhuman-style email interface
+app.get('/email-superhuman', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/email-superhuman.html'));
+});
+
 // Advanced Gmail API routes
 app.post('/api/gmail/bulk-action', async (req, res) => {
   try {
@@ -824,6 +832,7 @@ app.use('*', (req, res) => {
       'GET /api/chat/history/:sessionId',
       'DELETE /api/chat/history/:sessionId',
       'GET /email-dashboard',
+      'GET /email-superhuman',
       'POST /api/gmail/bulk-action',
       'POST /api/gmail/ai-suggestions',
       'POST /api/gmail/ai-reply',
