@@ -61,18 +61,36 @@ router.get('/auth/gmail', (req, res) => {
 router.get('/auth/gmail/callback', async (req, res) => {
   const { code } = req.query;
   
+  console.log('🔄 Gmail OAuth callback received');
+  console.log('  - Code:', code ? '✅ Present' : '❌ Missing');
+  console.log('  - Query params:', req.query);
+  
   if (!code) {
-    return res.status(400).json({
-      success: false,
-      error: 'Authorization code is required'
-    });
+    console.error('❌ No authorization code provided');
+    const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : 'http://localhost:4200';
+    
+    return res.redirect(`${frontendUrl}?gmail_auth=error&error=${encodeURIComponent('Authorization code is required')}`);
   }
   
   try {
     console.log('🔄 Exchanging authorization code for tokens...');
-    const { tokens } = await oauth2Client.getAccessToken(code);
+    console.log('  - Using redirect URI:', redirectUri);
+    console.log('  - Client ID:', process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing');
+    console.log('  - Client Secret:', process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
     
+    const tokenResponse = await oauth2Client.getAccessToken(code);
+    console.log('  - Token response:', tokenResponse);
+    
+    if (!tokenResponse || !tokenResponse.tokens) {
+      throw new Error('Invalid token response from Google OAuth');
+    }
+    
+    const { tokens } = tokenResponse;
     console.log('✅ Gmail OAuth completed successfully');
+    console.log('  - Access token:', tokens.access_token ? '✅ Present' : '❌ Missing');
+    console.log('  - Refresh token:', tokens.refresh_token ? '✅ Present' : '❌ Missing');
     
     // Redirect to frontend with success message
     const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
@@ -83,6 +101,8 @@ router.get('/auth/gmail/callback', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Gmail OAuth error:', error);
+    console.error('  - Error message:', error.message);
+    console.error('  - Error stack:', error.stack);
     
     const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -185,6 +205,41 @@ router.get('/auth/gmail/debug', (req, res) => {
     config,
     message: 'Gmail OAuth Configuration Debug Info'
   });
+});
+
+// Test OAuth configuration endpoint
+router.get('/auth/gmail/test', async (req, res) => {
+  try {
+    // Test if we can create a valid auth URL
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.modify'
+    ];
+
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: scopes,
+      prompt: 'consent'
+    });
+
+    res.json({
+      success: true,
+      testAuthUrl: url,
+      config: {
+        clientId: process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing',
+        clientSecret: process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing',
+        redirectUri: redirectUri
+      },
+      message: 'OAuth configuration test successful'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'OAuth configuration test failed'
+    });
+  }
 });
 
 export default router; 
