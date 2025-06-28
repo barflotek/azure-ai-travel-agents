@@ -80,17 +80,35 @@ router.get('/auth/gmail/callback', async (req, res) => {
     console.log('  - Client ID:', process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing');
     console.log('  - Client Secret:', process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
     
-    const tokenResponse = await oauth2Client.getAccessToken(code);
-    console.log('  - Token response:', tokenResponse);
+    // Create a fresh OAuth2 client for this request
+    const freshOAuth2Client = new google.auth.OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      redirectUri
+    );
     
-    if (!tokenResponse || !tokenResponse.tokens) {
-      throw new Error('Invalid token response from Google OAuth');
+    console.log('  - Fresh OAuth2 client created');
+    
+    const tokenResponse = await freshOAuth2Client.getAccessToken(code);
+    console.log('  - Raw token response:', JSON.stringify(tokenResponse, null, 2));
+    console.log('  - Token response type:', typeof tokenResponse);
+    console.log('  - Token response keys:', tokenResponse ? Object.keys(tokenResponse) : 'null/undefined');
+    
+    if (!tokenResponse) {
+      throw new Error('getAccessToken returned null or undefined');
+    }
+    
+    if (!tokenResponse.tokens) {
+      console.error('  - Token response structure:', tokenResponse);
+      throw new Error('Token response missing "tokens" property');
     }
     
     const { tokens } = tokenResponse;
     console.log('✅ Gmail OAuth completed successfully');
     console.log('  - Access token:', tokens.access_token ? '✅ Present' : '❌ Missing');
     console.log('  - Refresh token:', tokens.refresh_token ? '✅ Present' : '❌ Missing');
+    console.log('  - Token type:', tokens.token_type);
+    console.log('  - Expires in:', tokens.expires_in);
     
     // Redirect to frontend with success message
     const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
@@ -101,8 +119,17 @@ router.get('/auth/gmail/callback', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Gmail OAuth error:', error);
+    console.error('  - Error name:', error.name);
     console.error('  - Error message:', error.message);
     console.error('  - Error stack:', error.stack);
+    
+    // Check if it's a specific Google OAuth error
+    if (error.code) {
+      console.error('  - Error code:', error.code);
+    }
+    if (error.errors) {
+      console.error('  - Error details:', JSON.stringify(error.errors, null, 2));
+    }
     
     const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -210,6 +237,17 @@ router.get('/auth/gmail/debug', (req, res) => {
 // Test OAuth configuration endpoint
 router.get('/auth/gmail/test', async (req, res) => {
   try {
+    console.log('🧪 Testing OAuth configuration...');
+    
+    // Test if we can create a valid OAuth2 client
+    const testOAuth2Client = new google.auth.OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      redirectUri
+    );
+    
+    console.log('✅ OAuth2 client created successfully');
+    
     // Test if we can create a valid auth URL
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -217,11 +255,13 @@ router.get('/auth/gmail/test', async (req, res) => {
       'https://www.googleapis.com/auth/gmail.modify'
     ];
 
-    const url = oauth2Client.generateAuthUrl({
+    const url = testOAuth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent'
     });
+
+    console.log('✅ Auth URL generated successfully');
 
     res.json({
       success: true,
@@ -229,14 +269,17 @@ router.get('/auth/gmail/test', async (req, res) => {
       config: {
         clientId: process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing',
         clientSecret: process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing',
-        redirectUri: redirectUri
+        redirectUri: redirectUri,
+        railwayDomain: process.env.RAILWAY_PUBLIC_DOMAIN || 'Not set'
       },
       message: 'OAuth configuration test successful'
     });
   } catch (error) {
+    console.error('❌ OAuth configuration test failed:', error);
     res.status(500).json({
       success: false,
       error: error.message,
+      stack: error.stack,
       message: 'OAuth configuration test failed'
     });
   }
