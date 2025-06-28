@@ -436,7 +436,9 @@ app.post('/api/chat', async (req, res) => {
       const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
       const emailAgent = new EmailAgent(sessionId);
       emailAgent.setGmailAccess(gmailAccessToken);
-      conversationalAgent.setEmailAgent(emailAgent);
+      if (typeof conversationalAgent.setEmailAgent === 'function') {
+        conversationalAgent.setEmailAgent(emailAgent);
+      }
     }
     
     // Process the message
@@ -636,6 +638,166 @@ app.post('/api/gmail/delete-email', async (req, res) => {
   }
 });
 
+// Environment variables endpoint (for frontend configuration)
+app.get('/api/config', (req, res) => {
+  res.json({
+    elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ? 'configured' : 'not_configured',
+    elevenLabsVoiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel voice
+    hasVoiceSupport: true
+  });
+});
+
+// ElevenLabs usage tracking
+let elevenLabsUsage = {
+  charactersUsed: 0,
+  monthlyLimit: 10000, // Free tier: 10K characters/month
+  monthlyReset: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+  requests: []
+};
+
+// ElevenLabs TTS endpoint with usage tracking and limits
+app.post('/api/tts/elevenlabs', async (req, res) => {
+  try {
+    const { text, voiceId = '21m00Tcm4TlvDq8ikWAM' } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+    
+    if (!process.env.ELEVENLABS_API_KEY) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured' });
+    }
+    
+    // Check monthly usage limit
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    // Reset usage if it's a new month
+    if (elevenLabsUsage.monthlyReset.getMonth() !== currentMonth || 
+        elevenLabsUsage.monthlyReset.getFullYear() !== currentYear) {
+      elevenLabsUsage.charactersUsed = 0;
+      elevenLabsUsage.monthlyReset = new Date(currentYear, currentMonth + 1, 1);
+      elevenLabsUsage.requests = [];
+    }
+    
+    const textLength = text.length;
+    const remainingChars = elevenLabsUsage.monthlyLimit - elevenLabsUsage.charactersUsed;
+    
+    // Check if request would exceed limit
+    if (textLength > remainingChars) {
+      return res.status(429).json({ 
+        error: 'Monthly character limit exceeded',
+        details: {
+          requested: textLength,
+          remaining: remainingChars,
+          limit: elevenLabsUsage.monthlyLimit,
+          used: elevenLabsUsage.charactersUsed
+        }
+      });
+    }
+    
+    // Check if text is too long for a single request (ElevenLabs limit: ~2500 chars)
+    if (textLength > 2500) {
+      return res.status(400).json({ 
+        error: 'Text too long for single request',
+        details: {
+          length: textLength,
+          maxLength: 2500
+        }
+      });
+    }
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': process.env.ELEVENLABS_API_KEY
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5
+        }
+      })
+    });
+    
+    if (response.ok) {
+      // Track successful usage
+      elevenLabsUsage.charactersUsed += textLength;
+      elevenLabsUsage.requests.push({
+        timestamp: new Date(),
+        characters: textLength,
+        text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+        success: true
+      });
+      
+      const audioBuffer = await response.arrayBuffer();
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.byteLength,
+        'X-Usage-Remaining': remainingChars - textLength,
+        'X-Usage-Used': elevenLabsUsage.charactersUsed,
+        'X-Usage-Limit': elevenLabsUsage.monthlyLimit
+      });
+      res.send(Buffer.from(audioBuffer));
+    } else {
+      // Track failed request
+      elevenLabsUsage.requests.push({
+        timestamp: new Date(),
+        characters: textLength,
+        text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+        success: false,
+        error: response.status
+      });
+      
+      console.error('ElevenLabs API error:', response.status);
+      res.status(response.status).json({ error: 'ElevenLabs API error' });
+    }
+  } catch (error) {
+    console.error('ElevenLabs TTS error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ElevenLabs usage statistics endpoint
+app.get('/api/tts/usage', (req, res) => {
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  
+  // Reset usage if it's a new month
+  if (elevenLabsUsage.monthlyReset.getMonth() !== currentMonth || 
+      elevenLabsUsage.monthlyReset.getFullYear() !== currentYear) {
+    elevenLabsUsage.charactersUsed = 0;
+    elevenLabsUsage.monthlyReset = new Date(currentYear, currentMonth + 1, 1);
+    elevenLabsUsage.requests = [];
+  }
+  
+  const usagePercentage = (elevenLabsUsage.charactersUsed / elevenLabsUsage.monthlyLimit) * 100;
+  const remainingChars = elevenLabsUsage.monthlyLimit - elevenLabsUsage.charactersUsed;
+  
+  res.json({
+    usage: {
+      charactersUsed: elevenLabsUsage.charactersUsed,
+      charactersRemaining: remainingChars,
+      monthlyLimit: elevenLabsUsage.monthlyLimit,
+      percentageUsed: Math.round(usagePercentage * 100) / 100,
+      monthlyReset: elevenLabsUsage.monthlyReset
+    },
+    recentRequests: elevenLabsUsage.requests.slice(-10), // Last 10 requests
+    plan: 'Free Tier',
+    cost: '$0.00',
+    features: {
+      textToSpeech: true,
+      speechToText: true,
+      voiceGeneration: false,
+      customVoices: false
+    }
+  });
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -667,7 +829,10 @@ app.use('*', (req, res) => {
       'POST /api/gmail/ai-reply',
       'POST /api/gmail/analytics',
       'POST /api/gmail/mark-read',
-      'POST /api/gmail/delete-email'
+      'POST /api/gmail/delete-email',
+      'GET /api/config',
+      'POST /api/tts/elevenlabs',
+      'GET /api/tts/usage'
     ],
     timestamp: new Date().toISOString()
   });

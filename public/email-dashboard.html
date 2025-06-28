@@ -45,7 +45,7 @@
         <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
             <div class="flex justify-between items-center">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800">📧 Advanced Email Management</h1>
+                    <h1 class="text-3xl font-semibold text-gray-800">📧 Advanced Email Management</h1>
                     <p class="text-gray-600 mt-2">AI-powered inbox management and analytics</p>
                 </div>
                 <div class="flex space-x-4">
@@ -55,6 +55,78 @@
                     <button onclick="refreshEmails()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
                         <i class="fas fa-sync-alt mr-2"></i>Refresh
                     </button>
+                </div>
+            </div>
+            
+            <!-- Voice Controls -->
+            <div class="voice-controls mt-6 text-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                <button id="voiceToggle" onclick="toggleVoiceMode()" class="bg-green-500 text-white px-8 py-4 rounded-full text-lg hover:bg-green-600 transition-all shadow-lg hover:shadow-xl">
+                    🎤 Start Voice Chat
+                </button>
+                
+                <div id="voiceStatus" class="mt-3 text-lg font-medium text-gray-700">🎤 Click to start voice chat</div>
+                
+                <!-- ElevenLabs Usage Dashboard -->
+                <div id="elevenLabsUsage" class="mt-6 p-4 bg-white rounded-lg shadow-md">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">🎙️ ElevenLabs Usage</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600" id="charactersUsed">0</div>
+                            <div class="text-gray-600">Characters Used</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600" id="charactersRemaining">10,000</div>
+                            <div class="text-gray-600">Remaining</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600" id="usagePercentage">0%</div>
+                            <div class="text-gray-600">Used</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="usageBar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500 text-center">
+                        <span id="planInfo">Free Tier • $0.00/month</span>
+                        <br>
+                        <span id="resetInfo">Resets monthly</span>
+                    </div>
+                    <button onclick="refreshUsage()" class="mt-3 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
+                        🔄 Refresh Usage
+                    </button>
+                </div>
+                
+                <!-- Voice Quality Controls -->
+                <div class="mt-4 flex flex-wrap justify-center items-center gap-4 text-sm">
+                    <div class="flex items-center space-x-2">
+                        <label>Voice Speed:</label>
+                        <input type="range" id="voiceSpeed" min="0.5" max="2" step="0.1" value="1" class="w-20">
+                        <span id="speedValue">1x</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <label>Voice Pitch:</label>
+                        <input type="range" id="voicePitch" min="0.5" max="2" step="0.1" value="1" class="w-20">
+                        <span id="pitchValue">1x</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <label>Voice Quality:</label>
+                        <select id="voiceQuality" onchange="toggleVoiceQuality()" class="border rounded px-2 py-1">
+                            <option value="browser">Browser TTS</option>
+                            <option value="premium">Premium (ElevenLabs)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Conversation Mode Toggle -->
+                <div class="mt-3">
+                    <label class="flex items-center justify-center space-x-2">
+                        <input type="checkbox" id="conversationMode" checked>
+                        <span class="text-sm font-medium">Continuous Conversation Mode</span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -291,6 +363,21 @@
         const emailsPerPage = 20;
         let isLoading = false;
 
+        // ElevenLabs Configuration (Free tier: 10K chars/month)
+        let ELEVENLABS_API_KEY = ''; // Will be loaded from backend
+        const ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel voice (natural)
+        
+        // Voice System Variables
+        let recognition = null;
+        let synthesis = null;
+        let isListening = false;
+        let isSpeaking = false;
+        let conversationMode = false;
+        let silenceTimer = null;
+        let finalTranscript = '';
+        let selectedVoice = null;
+        let voiceQuality = 'browser'; // 'browser' or 'premium'
+
         // Performance optimization: Debounced filtering
         function debounce(func, wait) {
             return function executedFunction(...args) {
@@ -340,6 +427,10 @@
         window.addEventListener('load', function() {
             loadGmailToken();
             checkGmailAuthCallback();
+            loadConfiguration(); // Load ElevenLabs configuration
+            initVoice(); // Initialize voice system
+            setupVoiceControls(); // Setup voice control event listeners
+            
             if (gmailAccessToken) {
                 refreshEmails();
             }
@@ -348,6 +439,101 @@
             const emailListContainer = document.getElementById('emailList');
             emailListContainer.addEventListener('scroll', throttle(handleScroll, 100));
         });
+
+        async function loadConfiguration() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config`);
+                const config = await response.json();
+                
+                if (config.elevenLabsApiKey === 'configured') {
+                    // In a real app, you'd get the actual key from the backend
+                    // For security, the frontend should not have direct access to API keys
+                    console.log('ElevenLabs is configured and available');
+                    // Load usage statistics
+                    await refreshUsage();
+                } else {
+                    console.log('ElevenLabs not configured, using browser TTS only');
+                    // Disable premium voice options
+                    const qualitySelect = document.getElementById('voiceQuality');
+                    if (qualitySelect) {
+                        qualitySelect.innerHTML = '<option value="browser">Browser TTS</option>';
+                    }
+                    // Hide usage dashboard
+                    const usageDiv = document.getElementById('elevenLabsUsage');
+                    if (usageDiv) {
+                        usageDiv.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+            }
+        }
+
+        async function refreshUsage() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tts/usage`);
+                const usage = await response.json();
+                
+                // Update usage display
+                document.getElementById('charactersUsed').textContent = usage.usage.charactersUsed.toLocaleString();
+                document.getElementById('charactersRemaining').textContent = usage.usage.charactersRemaining.toLocaleString();
+                document.getElementById('usagePercentage').textContent = usage.usage.percentageUsed + '%';
+                
+                // Update progress bar
+                const usageBar = document.getElementById('usageBar');
+                usageBar.style.width = usage.usage.percentageUsed + '%';
+                
+                // Change color based on usage
+                if (usage.usage.percentageUsed > 80) {
+                    usageBar.className = 'bg-red-500 h-2 rounded-full transition-all duration-300';
+                } else if (usage.usage.percentageUsed > 60) {
+                    usageBar.className = 'bg-yellow-500 h-2 rounded-full transition-all duration-300';
+                } else {
+                    usageBar.className = 'bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300';
+                }
+                
+                // Update plan info
+                document.getElementById('planInfo').textContent = `${usage.plan} • ${usage.cost}/month`;
+                
+                // Update reset info
+                const resetDate = new Date(usage.usage.monthlyReset);
+                document.getElementById('resetInfo').textContent = `Resets on ${resetDate.toLocaleDateString()}`;
+                
+                // Store usage data for voice commands
+                window.elevenLabsUsage = usage;
+                
+            } catch (error) {
+                console.error('Error loading usage:', error);
+            }
+        }
+
+        function setupVoiceControls() {
+            // Voice speed and pitch controls
+            const speedSlider = document.getElementById('voiceSpeed');
+            const pitchSlider = document.getElementById('voicePitch');
+            const speedValue = document.getElementById('speedValue');
+            const pitchValue = document.getElementById('pitchValue');
+            
+            if (speedSlider && speedValue) {
+                speedSlider.addEventListener('input', (e) => {
+                    speedValue.textContent = e.target.value + 'x';
+                });
+            }
+            
+            if (pitchSlider && pitchValue) {
+                pitchSlider.addEventListener('input', (e) => {
+                    pitchValue.textContent = e.target.value + 'x';
+                });
+            }
+            
+            // Conversation mode toggle
+            const conversationModeCheckbox = document.getElementById('conversationMode');
+            if (conversationModeCheckbox) {
+                conversationModeCheckbox.addEventListener('change', (e) => {
+                    conversationMode = e.target.checked;
+                });
+            }
+        }
 
         // Gmail Integration Functions
         function loadGmailToken() {
@@ -968,6 +1154,299 @@
             renderEmailPage();
             
             isLoading = false;
+        }
+
+        // Voice System Functions
+        function initVoice() {
+            // Initialize speech recognition
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = () => {
+                    isListening = true;
+                    updateVoiceStatus('🎤 Listening...');
+                };
+                
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    
+                    if (finalTranscript) {
+                        handleVoiceCommand(finalTranscript.trim());
+                        resetSilenceTimer();
+                    }
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    updateVoiceStatus('❌ Voice recognition error');
+                    isListening = false;
+                };
+                
+                recognition.onend = () => {
+                    isListening = false;
+                    if (conversationMode) {
+                        startListening();
+                    } else {
+                        updateVoiceStatus('🎤 Click to start voice chat');
+                    }
+                };
+            }
+            
+            // Initialize speech synthesis
+            if ('speechSynthesis' in window) {
+                synthesis = window.speechSynthesis;
+                loadVoices();
+            }
+            
+            updateVoiceStatus('🎤 Click to start voice chat');
+        }
+        
+        function loadVoices() {
+            if (synthesis) {
+                synthesis.onvoiceschanged = () => {
+                    const voices = synthesis.getVoices();
+                    selectedVoice = voices.find(voice => voice.lang.includes('en')) || voices[0];
+                };
+                synthesis.getVoices();
+            }
+        }
+        
+        function startListening() {
+            if (recognition && !isListening) {
+                recognition.start();
+            }
+        }
+        
+        function stopListening() {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+        }
+        
+        function toggleVoiceMode() {
+            if (isListening) {
+                stopListening();
+                conversationMode = false;
+            } else {
+                startListening();
+                conversationMode = true;
+            }
+        }
+        
+        function updateVoiceStatus(message) {
+            const statusDiv = document.getElementById('voiceStatus');
+            if (statusDiv) {
+                statusDiv.textContent = message;
+            }
+        }
+        
+        function resetSilenceTimer() {
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+            }
+            silenceTimer = setTimeout(() => {
+                if (isListening) {
+                    stopListening();
+                    startListening();
+                }
+            }, 5000); // 5 seconds of silence
+        }
+        
+        async function speakText(text, usePremium = false) {
+            if (isSpeaking) return;
+            
+            isSpeaking = true;
+            
+            if (usePremium && ELEVENLABS_API_KEY) {
+                await speakWithElevenLabs(text);
+            } else {
+                speakWithBrowser(text);
+            }
+            
+            isSpeaking = false;
+        }
+        
+        function speakWithBrowser(text) {
+            if (synthesis && selectedVoice) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.voice = selectedVoice;
+                utterance.rate = parseFloat(document.getElementById('voiceSpeed')?.value || 1);
+                utterance.pitch = parseFloat(document.getElementById('voicePitch')?.value || 1);
+                
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    if (conversationMode && isListening) {
+                        resetSilenceTimer();
+                    }
+                };
+                
+                synthesis.speak(utterance);
+            }
+        }
+        
+        async function speakWithElevenLabs(text) {
+            try {
+                const response = await fetch(`${API_BASE}/api/tts/elevenlabs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        voiceId: ELEVENLABS_VOICE_ID
+                    })
+                });
+                
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    
+                    // Update usage display after successful request
+                    const remainingChars = response.headers.get('X-Usage-Remaining');
+                    const usedChars = response.headers.get('X-Usage-Used');
+                    const limitChars = response.headers.get('X-Usage-Limit');
+                    
+                    if (remainingChars && usedChars && limitChars) {
+                        // Update usage display immediately
+                        document.getElementById('charactersUsed').textContent = parseInt(usedChars).toLocaleString();
+                        document.getElementById('charactersRemaining').textContent = parseInt(remainingChars).toLocaleString();
+                        const percentage = Math.round((parseInt(usedChars) / parseInt(limitChars)) * 10000) / 100;
+                        document.getElementById('usagePercentage').textContent = percentage + '%';
+                        
+                        const usageBar = document.getElementById('usageBar');
+                        usageBar.style.width = percentage + '%';
+                        
+                        if (percentage > 80) {
+                            usageBar.className = 'bg-red-500 h-2 rounded-full transition-all duration-300';
+                        } else if (percentage > 60) {
+                            usageBar.className = 'bg-yellow-500 h-2 rounded-full transition-all duration-300';
+                        }
+                    }
+                    
+                    audio.onended = () => {
+                        isSpeaking = false;
+                        URL.revokeObjectURL(audioUrl);
+                        if (conversationMode && isListening) {
+                            resetSilenceTimer();
+                        }
+                    };
+                    
+                    audio.play();
+                } else if (response.status === 429) {
+                    // Monthly limit exceeded
+                    const errorData = await response.json();
+                    console.error('ElevenLabs monthly limit exceeded:', errorData);
+                    speakWithBrowser(`Monthly character limit exceeded. You have ${errorData.details.remaining} characters remaining. Falling back to browser voice.`);
+                } else if (response.status === 400) {
+                    // Text too long
+                    const errorData = await response.json();
+                    console.error('ElevenLabs text too long:', errorData);
+                    speakWithBrowser(`Text too long for ElevenLabs. Maximum is ${errorData.details.maxLength} characters. Falling back to browser voice.`);
+                } else {
+                    console.error('ElevenLabs API error:', response.status);
+                    // Fallback to browser TTS
+                    speakWithBrowser(text);
+                }
+            } catch (error) {
+                console.error('ElevenLabs error:', error);
+                // Fallback to browser TTS
+                speakWithBrowser(text);
+            }
+        }
+        
+        function handleVoiceCommand(command) {
+            console.log('Voice command:', command);
+            
+            // Email-related voice commands
+            if (command.toLowerCase().includes('check email') || command.toLowerCase().includes('check emails')) {
+                refreshEmails();
+                speakText('Checking your emails now.');
+            } else if (command.toLowerCase().includes('send email')) {
+                showSendEmailForm();
+                speakText('Opening email composer.');
+            } else if (command.toLowerCase().includes('mark read')) {
+                // Mark selected emails as read
+                if (selectedEmails.size > 0) {
+                    bulkAction('read');
+                    speakText(`Marked ${selectedEmails.size} emails as read.`);
+                } else {
+                    speakText('No emails selected. Please select emails first.');
+                }
+            } else if (command.toLowerCase().includes('delete') && command.toLowerCase().includes('email')) {
+                // Delete selected emails
+                if (selectedEmails.size > 0) {
+                    bulkAction('delete');
+                    speakText(`Deleted ${selectedEmails.size} emails.`);
+                } else {
+                    speakText('No emails selected. Please select emails first.');
+                }
+            } else if (command.toLowerCase().includes('select all')) {
+                selectAllEmails();
+                speakText('Selected all emails.');
+            } else if (command.toLowerCase().includes('clear selection')) {
+                selectedEmails.clear();
+                updateBulkActions();
+                speakText('Cleared email selection.');
+            } else if (command.toLowerCase().includes('analytics') || command.toLowerCase().includes('stats')) {
+                getEmailAnalytics();
+                speakText('Loading email analytics.');
+            } else if (command.toLowerCase().includes('disconnect') || command.toLowerCase().includes('logout')) {
+                disconnectGmail();
+                speakText('Disconnected from Gmail.');
+            } else if (command.toLowerCase().includes('usage') || command.toLowerCase().includes('elevenlabs usage')) {
+                // Check ElevenLabs usage
+                refreshUsage().then(() => {
+                    if (window.elevenLabsUsage) {
+                        const usage = window.elevenLabsUsage.usage;
+                        const message = `You have used ${usage.charactersUsed.toLocaleString()} characters out of ${usage.monthlyLimit.toLocaleString()}. That's ${usage.percentageUsed}% of your free tier limit. You have ${usage.charactersRemaining.toLocaleString()} characters remaining this month.`;
+                        speakText(message, voiceQuality === 'premium');
+                    } else {
+                        speakText('Unable to load usage statistics.', voiceQuality === 'premium');
+                    }
+                });
+            } else if (command.toLowerCase().includes('voice quality') || command.toLowerCase().includes('switch voice')) {
+                // Toggle voice quality
+                const qualitySelect = document.getElementById('voiceQuality');
+                if (qualitySelect) {
+                    const currentQuality = qualitySelect.value;
+                    const newQuality = currentQuality === 'browser' ? 'premium' : 'browser';
+                    qualitySelect.value = newQuality;
+                    voiceQuality = newQuality;
+                    const message = newQuality === 'premium' ? 
+                        'Switched to premium ElevenLabs voice quality.' : 
+                        'Switched to browser voice quality.';
+                    speakText(message, newQuality === 'premium');
+                }
+            } else {
+                // General response
+                speakText(`I heard: ${command}. You can say "check emails", "send email", "mark read", "analytics", "usage", or "voice quality" for different actions.`, voiceQuality === 'premium');
+            }
+        }
+        
+        // Voice quality toggle
+        function toggleVoiceQuality() {
+            const qualitySelect = document.getElementById('voiceQuality');
+            if (qualitySelect) {
+                voiceQuality = qualitySelect.value;
+                const message = voiceQuality === 'premium' ? 
+                    'Switched to premium voice quality.' : 
+                    'Switched to browser voice quality.';
+                speakText(message, voiceQuality === 'premium');
+            }
         }
     </script>
 </body>

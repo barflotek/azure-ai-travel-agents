@@ -219,20 +219,30 @@ export class MainConversationalAgent {
       };
     }
 
+    if (this.emailAgent) {
+      // Use the injected email agent for processing
+      try {
+        const result = await this.emailAgent.processTask({
+          type: 'compose',
+          recipient: entities.email,
+          subject: entities.subject || 'Message from Business Agent System',
+          content: entities.content || 'I hope this message finds you well.'
+        });
+        return {
+          content: `I've composed an email for you:\n\n**To:** ${entities.email}\n**Subject:** ${result.subject}\n\n${result.body}\n\nWould you like me to make any adjustments before sending?`,
+          actions: [{ type: 'email_composed', data: result }]
+        };
+      } catch (error) {
+        return {
+          content: "I encountered an error while composing your email. Please try again with more specific details."
+        };
+      }
+    }
+
+    // Fallback: default logic
     const subject = entities.subject || 'Message from Business Agent System';
     const content = entities.content || 'I hope this message finds you well.';
-    
-    const composedEmail = `Dear ${entities.email.split('@')[0]},
-
-${content}
-
-Best regards,
-Your Business Agent System Team
-
----
-Subject: ${subject}
-Generated: ${new Date().toISOString()}`;
-
+    const composedEmail = `Dear ${entities.email.split('@')[0]},\n\n${content}\n\nBest regards,\nYour Business Agent System Team\n\n---\nSubject: ${subject}\nGenerated: ${new Date().toISOString()}`;
     return {
       content: `I've composed an email for you:\n\n**To:** ${entities.email}\n**Subject:** ${subject}\n\n${composedEmail}\n\nWould you like me to make any adjustments before sending?`,
       actions: [{ type: 'email_composed', data: { subject, content: composedEmail } }]
@@ -381,5 +391,9 @@ What would you like to work on today?
 
   generateMessageId() {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  setEmailAgent(emailAgent) {
+    this.emailAgent = emailAgent;
   }
 } 
