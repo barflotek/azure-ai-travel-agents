@@ -69,6 +69,10 @@
                             class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
                         ✉️ Send Email
                     </button>
+                    <button onclick="disconnectGmail()" 
+                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        🔌 Disconnect
+                    </button>
                 </div>
             </div>
             
@@ -624,6 +628,29 @@
         }
 
         // Gmail Integration Functions
+        // Load Gmail token from localStorage on page load
+        function loadGmailToken() {
+            const savedToken = localStorage.getItem('gmailAccessToken');
+            if (savedToken) {
+                gmailAccessToken = savedToken;
+                updateGmailStatus(true, 'Gmail connected (from saved session)');
+                return true;
+            }
+            return false;
+        }
+        
+        // Save Gmail token to localStorage
+        function saveGmailToken(token) {
+            gmailAccessToken = token;
+            localStorage.setItem('gmailAccessToken', token);
+        }
+        
+        // Clear Gmail token from localStorage
+        function clearGmailToken() {
+            gmailAccessToken = null;
+            localStorage.removeItem('gmailAccessToken');
+        }
+        
         function connectGmail() {
             // Get the auth URL from the server
             fetch(`${API_BASE}/api/auth/gmail`)
@@ -641,7 +668,12 @@
                 });
         }
         
-        // Check for OAuth callback parameters on page load
+        function disconnectGmail() {
+            clearGmailToken();
+            updateGmailStatus(false, 'Gmail disconnected');
+            showNotification('🔌 Gmail disconnected', 'info');
+        }
+        
         function checkGmailAuthCallback() {
             const urlParams = new URLSearchParams(window.location.search);
             const gmailAuth = urlParams.get('gmail_auth');
@@ -651,7 +683,7 @@
                 const refreshToken = urlParams.get('refresh_token');
                 
                 if (accessToken) {
-                    gmailAccessToken = accessToken;
+                    saveGmailToken(accessToken);
                     updateGmailStatus(true, 'Gmail connected successfully!');
                     
                     // Clean up URL parameters
@@ -1024,6 +1056,7 @@
         window.addEventListener('load', function() {
             initVoice();
             checkStatus();
+            loadGmailToken(); // Load saved Gmail token
             checkGmailAuthCallback(); // Check for Gmail OAuth callback
             
             // Set up voice toggle button

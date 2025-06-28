@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+// Check if Supabase is configured
+const isSupabaseConfigured = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Only create client if configured
+export const supabase = isSupabaseConfigured 
+  ? createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
+  : null;
 
 // Database interfaces
 export interface AgentConversation {
@@ -41,6 +44,11 @@ export interface AgentTask {
 // Database helper functions
 export class SupabaseClient {
   static async saveConversation(conversation: Partial<AgentConversation>) {
+    if (!supabase) {
+      console.log('⚠️ Supabase not configured, skipping conversation save');
+      return { id: 'temp-' + Date.now(), ...conversation };
+    }
+
     const { data, error } = await supabase
       .from('agent_conversations')
       .insert([conversation])
@@ -52,6 +60,11 @@ export class SupabaseClient {
   }
 
   static async getConversation(id: string) {
+    if (!supabase) {
+      console.log('⚠️ Supabase not configured, cannot retrieve conversation');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('agent_conversations')
       .select('*')
@@ -63,6 +76,11 @@ export class SupabaseClient {
   }
 
   static async saveBusinessConnection(connection: Partial<BusinessConnection>) {
+    if (!supabase) {
+      console.log('⚠️ Supabase not configured, skipping business connection save');
+      return { id: 'temp-' + Date.now(), ...connection };
+    }
+
     const { data, error } = await supabase
       .from('business_connections')
       .upsert([connection])
@@ -74,6 +92,11 @@ export class SupabaseClient {
   }
 
   static async getActiveConnections(userId: string, integrationType?: string) {
+    if (!supabase) {
+      console.log('⚠️ Supabase not configured, returning empty connections list');
+      return [];
+    }
+
     let query = supabase
       .from('business_connections')
       .select('*')
