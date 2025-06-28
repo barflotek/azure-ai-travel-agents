@@ -18,6 +18,25 @@
         .category-promotional { background-color: #fecaca; }
         .category-urgent { background-color: #fee2e2; }
         .category-meeting { background-color: #dcfce7; }
+        
+        /* Performance optimizations */
+        .email-card { 
+            will-change: transform;
+            contain: layout style paint;
+        }
+        .email-list-container {
+            contain: layout style;
+            height: 600px;
+            overflow-y: auto;
+        }
+        .email-item {
+            contain: layout style paint;
+        }
+        /* Reduce repaints */
+        * { 
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -135,7 +154,7 @@
                         </div>
                     </div>
                     
-                    <div id="emailList" class="space-y-4">
+                    <div id="emailList" class="email-list-container space-y-4">
                         <div class="text-center text-gray-500 py-8">
                             <i class="fas fa-inbox text-4xl mb-4"></i>
                             <p>No emails loaded. Connect Gmail to get started.</p>
@@ -264,8 +283,58 @@
         const API_BASE = 'https://azure-ai-travel-agents-production.up.railway.app';
         let gmailAccessToken = null;
         let emails = [];
+        let filteredEmails = [];
         let selectedEmails = new Set();
         let priorityChart = null;
+        let filterTimeout = null;
+        let currentPage = 0;
+        const emailsPerPage = 20;
+        let isLoading = false;
+
+        // Performance optimization: Debounced filtering
+        function debounce(func, wait) {
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(filterTimeout);
+                    func(...args);
+                };
+                clearTimeout(filterTimeout);
+                filterTimeout = setTimeout(later, wait);
+            };
+        }
+
+        // Performance optimization: Throttle scroll events
+        function throttle(func, limit) {
+            let inThrottle;
+            return function() {
+                const args = arguments;
+                const context = this;
+                if (!inThrottle) {
+                    func.apply(context, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            }
+        }
+
+        // Cache DOM elements for better performance
+        const domCache = {
+            emailList: null,
+            totalEmails: null,
+            unreadCount: null,
+            todayCount: null,
+            weekCount: null,
+            aiSuggestions: null,
+            bulkActions: null,
+            selectedCount: null
+        };
+
+        function getCachedElement(id) {
+            if (!domCache[id]) {
+                domCache[id] = document.getElementById(id);
+            }
+            return domCache[id];
+        }
 
         // Initialize dashboard
         window.addEventListener('load', function() {
@@ -274,6 +343,10 @@
             if (gmailAccessToken) {
                 refreshEmails();
             }
+            
+            // Add scroll listener for infinite loading
+            const emailListContainer = document.getElementById('emailList');
+            emailListContainer.addEventListener('scroll', throttle(handleScroll, 100));
         });
 
         // Gmail Integration Functions
@@ -376,6 +449,22 @@
                 return;
             }
 
+            if (isLoading) {
+                console.log('Already loading emails...');
+                return;
+            }
+
+            isLoading = true;
+            
+            // Show loading state
+            const emailListDiv = document.getElementById('emailList');
+            emailListDiv.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                    <p>Loading emails...</p>
+                </div>
+            `;
+
             try {
                 const result = await apiCall('/api/gmail/check-emails', 'POST', {
                     accessToken: gmailAccessToken
@@ -388,10 +477,22 @@
                     updateAnalytics();
                     generateAISuggestions();
                 } else {
-                    alert('Failed to refresh emails: ' + result.message);
+                    emailListDiv.innerHTML = `
+                        <div class="text-center text-red-500 py-8">
+                            <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                            <p>Failed to load emails: ${result.message}</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                alert('Error refreshing emails: ' + error.message);
+                emailListDiv.innerHTML = `
+                    <div class="text-center text-red-500 py-8">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                        <p>Error loading emails: ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
             }
         }
 
@@ -408,49 +509,92 @@
                 return;
             }
 
-            const filteredEmails = filterEmailsByCriteria(emails);
+            // Apply filters
+            filteredEmails = filterEmailsByCriteria(emails);
             
-            emailListDiv.innerHTML = filteredEmails.map(email => `
-                <div class="email-card bg-white border rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer priority-${email.priority || 'medium'} category-${email.category || 'personal'}" 
-                     onclick="openEmailModal('${email.id}')">
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                            <div class="flex items-center space-x-2 mb-2">
-                                <input type="checkbox" class="email-checkbox" 
-                                       onchange="toggleEmailSelection('${email.id}', this.checked)"
-                                       ${selectedEmails.has(email.id) ? 'checked' : ''}>
-                                <span class="font-medium text-gray-900">${email.from}</span>
-                                <span class="text-xs px-2 py-1 rounded-full ${
-                                    email.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                    email.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-green-100 text-green-800'
-                                }">${email.priority || 'medium'}</span>
-                                <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">${email.category || 'personal'}</span>
-                            </div>
-                            <h3 class="font-semibold text-gray-800 mb-1">${email.subject}</h3>
-                            <p class="text-sm text-gray-600 mb-2">${email.preview || email.body.substring(0, 100)}...</p>
-                            <div class="flex items-center justify-between text-xs text-gray-500">
-                                <span>${new Date(email.date).toLocaleDateString()}</span>
-                                ${!email.isRead ? '<span class="bg-blue-500 text-white px-2 py-1 rounded-full">Unread</span>' : ''}
-                            </div>
+            // Reset pagination
+            currentPage = 0;
+            
+            // Render first page
+            renderEmailPage();
+        }
+
+        function renderEmailPage() {
+            const emailListDiv = document.getElementById('emailList');
+            const startIndex = currentPage * emailsPerPage;
+            const endIndex = startIndex + emailsPerPage;
+            const pageEmails = filteredEmails.slice(startIndex, endIndex);
+            
+            if (currentPage === 0) {
+                // Clear and render first page
+                emailListDiv.innerHTML = '';
+            }
+            
+            // Create document fragment for better performance
+            const fragment = document.createDocumentFragment();
+            
+            pageEmails.forEach(email => {
+                const emailElement = createEmailElement(email);
+                fragment.appendChild(emailElement);
+            });
+            
+            emailListDiv.appendChild(fragment);
+            
+            // Show loading indicator if more emails available
+            if (endIndex < filteredEmails.length) {
+                const loadingElement = document.createElement('div');
+                loadingElement.id = 'loading-indicator';
+                loadingElement.className = 'text-center text-gray-500 py-4';
+                loadingElement.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading more emails...';
+                emailListDiv.appendChild(loadingElement);
+            }
+        }
+
+        function createEmailElement(email) {
+            const emailDiv = document.createElement('div');
+            emailDiv.className = `email-card email-item bg-white border rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer priority-${email.priority || 'medium'} category-${email.category || 'personal'}`;
+            emailDiv.onclick = () => openEmailModal(email.id);
+            
+            emailDiv.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <input type="checkbox" class="email-checkbox" 
+                                   onchange="toggleEmailSelection('${email.id}', this.checked)"
+                                   ${selectedEmails.has(email.id) ? 'checked' : ''}>
+                            <span class="font-medium text-gray-900">${email.from}</span>
+                            <span class="text-xs px-2 py-1 rounded-full ${
+                                email.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                email.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                            }">${email.priority || 'medium'}</span>
+                            <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">${email.category || 'personal'}</span>
                         </div>
-                        <div class="flex space-x-2 ml-4">
-                            <button onclick="event.stopPropagation(); markAsRead('${email.id}')" 
-                                    class="text-blue-500 hover:text-blue-700">
-                                <i class="fas fa-check"></i>
-                            </button>
-                            <button onclick="event.stopPropagation(); generateAIReply('${email.id}')" 
-                                    class="text-green-500 hover:text-green-700">
-                                <i class="fas fa-reply"></i>
-                            </button>
-                            <button onclick="event.stopPropagation(); deleteEmail('${email.id}')" 
-                                    class="text-red-500 hover:text-red-700">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        <h3 class="font-semibold text-gray-800 mb-1">${email.subject}</h3>
+                        <p class="text-sm text-gray-600 mb-2">${email.preview || email.body.substring(0, 100)}...</p>
+                        <div class="flex items-center justify-between text-xs text-gray-500">
+                            <span>${new Date(email.date).toLocaleDateString()}</span>
+                            ${!email.isRead ? '<span class="bg-blue-500 text-white px-2 py-1 rounded-full">Unread</span>' : ''}
                         </div>
                     </div>
+                    <div class="flex space-x-2 ml-4">
+                        <button onclick="event.stopPropagation(); markAsRead('${email.id}')" 
+                                class="text-blue-500 hover:text-blue-700">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); generateAIReply('${email.id}')" 
+                                class="text-green-500 hover:text-green-700">
+                            <i class="fas fa-reply"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteEmail('${email.id}')" 
+                                class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
-            `).join('');
+            `;
+            
+            return emailDiv;
         }
 
         function filterEmailsByCriteria(emailList) {
@@ -465,7 +609,12 @@
         }
 
         function filterEmails() {
-            updateEmailList();
+            // Debounced filtering for better performance
+            debounce(() => {
+                filteredEmails = filterEmailsByCriteria(emails);
+                currentPage = 0;
+                renderEmailPage();
+            }, 300)();
         }
 
         function toggleEmailSelection(emailId, checked) {
@@ -489,14 +638,14 @@
         }
 
         function updateBulkActions() {
-            const bulkActionsDiv = document.getElementById('bulkActions');
-            const selectedCountSpan = document.getElementById('selectedCount');
+            const bulkActionsDiv = getCachedElement('bulkActions');
+            const selectedCountSpan = getCachedElement('selectedCount');
             
             if (selectedEmails.size > 0) {
-                bulkActionsDiv.classList.remove('hidden');
-                selectedCountSpan.textContent = `${selectedEmails.size} emails selected`;
+                if (bulkActionsDiv) bulkActionsDiv.classList.remove('hidden');
+                if (selectedCountSpan) selectedCountSpan.textContent = `${selectedEmails.size} emails selected`;
             } else {
-                bulkActionsDiv.classList.add('hidden');
+                if (bulkActionsDiv) bulkActionsDiv.classList.add('hidden');
             }
         }
 
@@ -531,10 +680,15 @@
         }
 
         function updateStats() {
-            document.getElementById('totalEmails').textContent = emails.length;
-            document.getElementById('unreadCount').textContent = emails.filter(e => !e.isRead).length;
-            document.getElementById('todayCount').textContent = emails.filter(e => isToday(new Date(e.date))).length;
-            document.getElementById('weekCount').textContent = emails.filter(e => isThisWeek(new Date(e.date))).length;
+            const totalEmailsEl = getCachedElement('totalEmails');
+            const unreadCountEl = getCachedElement('unreadCount');
+            const todayCountEl = getCachedElement('todayCount');
+            const weekCountEl = getCachedElement('weekCount');
+            
+            if (totalEmailsEl) totalEmailsEl.textContent = emails.length;
+            if (unreadCountEl) unreadCountEl.textContent = emails.filter(e => !e.isRead).length;
+            if (todayCountEl) todayCountEl.textContent = emails.filter(e => isToday(new Date(e.date))).length;
+            if (weekCountEl) weekCountEl.textContent = emails.filter(e => isThisWeek(new Date(e.date))).length;
         }
 
         function updateAnalytics() {
@@ -544,11 +698,14 @@
                 low: emails.filter(e => e.priority === 'low').length
             };
 
+            // Destroy existing chart if it exists
             if (priorityChart) {
                 priorityChart.destroy();
             }
 
-            const ctx = document.getElementById('priorityChart').getContext('2d');
+            const ctx = document.getElementById('priorityChart');
+            if (!ctx) return;
+
             priorityChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -560,7 +717,19 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 500
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -765,6 +934,41 @@
                 closeSendEmailModal();
             }
         });
+
+        function handleScroll() {
+            const emailListContainer = document.getElementById('emailList');
+            const scrollTop = emailListContainer.scrollTop;
+            const scrollHeight = emailListContainer.scrollHeight;
+            const clientHeight = emailListContainer.clientHeight;
+            
+            // Load more emails when near bottom
+            if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading) {
+                loadMoreEmails();
+            }
+        }
+
+        function loadMoreEmails() {
+            if (isLoading) return;
+            
+            const nextPage = currentPage + 1;
+            const startIndex = nextPage * emailsPerPage;
+            
+            if (startIndex >= filteredEmails.length) return;
+            
+            isLoading = true;
+            
+            // Remove loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
+            
+            // Load next page
+            currentPage = nextPage;
+            renderEmailPage();
+            
+            isLoading = false;
+        }
     </script>
 </body>
 </html> 
