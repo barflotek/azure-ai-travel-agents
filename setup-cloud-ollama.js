@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Cloud Ollama Setup Helper Script
-const readline = require('readline');
+import readline from 'readline';
 
 const rl = readline.createInterface({
   input: process.stdin,
