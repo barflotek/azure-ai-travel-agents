@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import multer from 'multer';
 import { 
   EmailAgent, 
   FinanceAgent, 
@@ -19,14 +20,216 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Knowledge routes
-try {
-  const knowledgeRoutes = require('../../routes/knowledge-routes');
-  app.use('/api/knowledge', knowledgeRoutes);
-  console.log('Knowledge routes loaded successfully');
-} catch (error) {
-  console.error('Failed to load knowledge routes:', error);
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept PDF, TXT, DOC, DOCX files
+    if (file.mimetype === 'application/pdf' ||
+        file.mimetype === 'text/plain' ||
+        file.mimetype === 'application/msword' ||
+        file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, TXT, DOC, DOCX files are allowed.'));
+    }
+  }
+});
+
+// Store knowledge agents per user (in production, use proper session management)
+const knowledgeAgents = new Map<string, KnowledgeAgent>();
+
+function getOrCreateAgent(userId: string = 'default'): KnowledgeAgent {
+  if (!knowledgeAgents.has(userId)) {
+    knowledgeAgents.set(userId, new KnowledgeAgent(userId));
+  }
+  return knowledgeAgents.get(userId)!;
 }
+
+// Serve knowledge dashboard
+app.get('/knowledge', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/knowledge-dashboard.html'));
+});
+
+// Knowledge routes
+app.get('/api/knowledge/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/knowledge-dashboard.html'));
+});
+
+app.post('/api/knowledge/upload', upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({
+        status: 'error',
+        message: 'No file uploaded'
+      });
+      return;
+    }
+
+    const userId = req.body.userId || 'default-user';
+    const agent = new KnowledgeAgent(userId);
+
+    // Convert file buffer to text (simplified - in production, use proper PDF parsing)
+    const documentContent = req.file.buffer.toString('utf-8');
+    
+    const result = await agent.processTask({
+      type: 'upload_document',
+      content: req.file.originalname,
+      documentType: req.file.mimetype === 'application/pdf' ? 'pdf' : 
+                   req.file.mimetype === 'text/plain' ? 'txt' : 'doc',
+      documentContent: documentContent
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Document uploaded successfully',
+      document: result
+    });
+
+  } catch (error: any) {
+    console.error('Upload error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to upload document'
+    });
+  }
+});
+
+app.post('/api/knowledge/ask', async (req, res) => {
+  try {
+    const { userId, question } = req.body;
+
+    if (!question) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Question is required'
+      });
+      return;
+    }
+
+    const agent = new KnowledgeAgent(userId || 'default-user');
+    
+    const result = await agent.processTask({
+      type: 'ask_question',
+      question: question
+    });
+
+    res.json({
+      status: 'success',
+      answer: result
+    });
+
+  } catch (error: any) {
+    console.error('Question error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to process question'
+    });
+  }
+});
+
+app.post('/api/knowledge/search', async (req, res) => {
+  try {
+    const { userId, searchQuery } = req.body;
+
+    if (!searchQuery) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Search query is required'
+      });
+      return;
+    }
+
+    const agent = new KnowledgeAgent(userId || 'default-user');
+    
+    const result = await agent.processTask({
+      type: 'search',
+      searchQuery: searchQuery
+    });
+
+    res.json({
+      status: 'success',
+      results: result
+    });
+
+  } catch (error: any) {
+    console.error('Search error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to search knowledge base'
+    });
+  }
+});
+
+app.post('/api/knowledge/advice', async (req, res) => {
+  try {
+    const { userId, situation, context } = req.body;
+
+    if (!situation) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Business situation is required'
+      });
+      return;
+    }
+
+    const agent = new KnowledgeAgent(userId || 'default-user');
+    
+    const result = await agent.processTask({
+      type: 'get_advice',
+      question: situation,
+      context: context
+    });
+
+    res.json({
+      status: 'success',
+      advice: result
+    });
+
+  } catch (error: any) {
+    console.error('Advice error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to generate advice'
+    });
+  }
+});
+
+app.post('/api/knowledge/summarize', async (req, res) => {
+  try {
+    const { userId, documentContent } = req.body;
+
+    if (!documentContent) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Document content is required'
+      });
+      return;
+    }
+
+    const agent = new KnowledgeAgent(userId || 'default-user');
+    
+    const result = await agent.processTask({
+      type: 'summarize_document',
+      content: documentContent
+    });
+
+    res.json({
+      status: 'success',
+      summary: result
+    });
+
+  } catch (error: any) {
+    console.error('Summarize error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to summarize document'
+    });
+  }
+});
 
 // Test knowledge route
 app.get('/api/knowledge/test', (req, res) => {
@@ -55,11 +258,6 @@ app.get('/health', (req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
-});
-
-// Serve knowledge dashboard
-app.get('/knowledge', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/knowledge-dashboard.html'));
 });
 
 // Test endpoint to verify system functionality
