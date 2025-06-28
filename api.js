@@ -559,6 +559,27 @@ app.get('/api/gmail/emails', async (req, res) => {
       });
     }
 
+    // First, validate the token
+    try {
+      const { google } = await import('googleapis');
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: accessToken });
+      
+      // Test the token by making a simple Gmail API call
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      await gmail.users.getProfile({ userId: 'me' });
+      
+    } catch (tokenError) {
+      console.error('Token validation failed:', tokenError.message);
+      
+      // If token is invalid, suggest re-authentication
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired access token. Please reconnect Gmail.',
+        requiresReauth: true
+      });
+    }
+
     // Import and use Email Agent with Gmail
     const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
     const emailAgent = new EmailAgent('gmail-user');
@@ -574,10 +595,59 @@ app.get('/api/gmail/emails', async (req, res) => {
     });
   } catch (error) {
     console.error('Gmail get emails error:', error);
+    
+    // Check if it's an authentication error
+    if (error.message && error.message.includes('invalid authentication credentials')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired access token. Please reconnect Gmail.',
+        requiresReauth: true
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to load emails',
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Token validation endpoint
+app.get('/api/gmail/validate-token', async (req, res) => {
+  try {
+    const accessToken = req.query.accessToken || req.headers['x-access-token'];
+    
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Access token required'
+      });
+    }
+
+    const { google } = await import('googleapis');
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    
+    // Test the token by making a simple Gmail API call
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    
+    res.json({
+      success: true,
+      isValid: true,
+      email: profile.data.emailAddress,
+      messagesTotal: profile.data.messagesTotal,
+      threadsTotal: profile.data.threadsTotal
+    });
+    
+  } catch (error) {
+    console.error('Token validation error:', error);
+    res.status(401).json({
+      success: false,
+      isValid: false,
+      error: 'Invalid or expired access token',
+      requiresReauth: true
     });
   }
 });

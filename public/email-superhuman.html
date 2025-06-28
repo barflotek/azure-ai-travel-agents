@@ -319,10 +319,31 @@
 
         function checkGmailConnection() {
             if (gmailAccessToken) {
-                updateGmailStatus(true, 'Gmail connected');
-                loadEmails();
+                // Validate the token first
+                validateToken().then(isValid => {
+                    if (isValid) {
+                        updateGmailStatus(true, 'Gmail connected');
+                        loadEmails();
+                    } else {
+                        clearGmailToken();
+                        updateGmailStatus(false, 'Gmail session expired. Please reconnect.');
+                    }
+                });
             } else {
                 updateGmailStatus(false, 'Gmail not connected');
+            }
+        }
+
+        async function validateToken() {
+            if (!gmailAccessToken) return false;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/validate-token?accessToken=${encodeURIComponent(gmailAccessToken)}`);
+                const data = await response.json();
+                return data.success && data.isValid;
+            } catch (error) {
+                console.error('Token validation error:', error);
+                return false;
             }
         }
 
@@ -366,7 +387,15 @@
                     renderEmailList();
                     updateStats();
                 } else {
-                    showErrorState(data.error || 'Failed to load emails');
+                    // Check if re-authentication is required
+                    if (data.requiresReauth || data.error?.includes('expired') || data.error?.includes('invalid')) {
+                        console.log('Token expired or invalid, clearing and requesting re-authentication');
+                        clearGmailToken();
+                        updateGmailStatus(false, 'Gmail session expired. Please reconnect.');
+                        showErrorState('Gmail session expired. Please click "Connect Gmail" to reconnect.');
+                    } else {
+                        showErrorState(data.error || 'Failed to load emails');
+                    }
                 }
             } catch (error) {
                 console.error('Error loading emails:', error);
