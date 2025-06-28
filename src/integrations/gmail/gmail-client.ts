@@ -120,17 +120,16 @@ export class GmailClient {
       const messages = response.data.messages || [];
       console.log(`📧 Found ${messages.length} messages, processing...`);
 
-      // Fetch full message details to get headers (from, subject)
+      // Fetch full message details to get headers and body
       const emailPromises = messages.map(async (msg) => {
         try {
           const messageResponse = await this.gmail.users.messages.get({
             userId: 'me',
-            id: msg.id,
-            format: 'metadata',
-            metadataHeaders: ['From', 'Subject', 'To', 'Date']
+            id: msg.id
           });
 
-          const headers = messageResponse.data.payload?.headers || [];
+          const message = messageResponse.data;
+          const headers = message.payload?.headers || [];
           const getHeader = (name: string) => 
             headers.find((h: any) => h.name === name)?.value || '';
 
@@ -140,7 +139,7 @@ export class GmailClient {
             from: getHeader('From') || 'Unknown Sender',
             to: getHeader('To') || '',
             date: new Date(parseInt(msg.internalDate)),
-            body: '', // Not needed for list view
+            body: this.extractEmailBody(message.payload),
             isRead: !msg.labelIds?.includes('UNREAD'),
             snippet: msg.snippet || '',
             labels: msg.labelIds || []
