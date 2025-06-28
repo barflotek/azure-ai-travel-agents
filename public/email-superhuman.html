@@ -458,7 +458,43 @@
             document.querySelectorAll('.email-item').forEach(item => item.classList.remove('selected'));
             document.querySelector(`[data-index="${index}"]`)?.classList.add('selected');
             
+            // Mark as read if unread
+            if (selectedEmail && !selectedEmail.isRead) {
+                markEmailAsRead(selectedEmail.id);
+            }
+            
             renderEmailDetail();
+        }
+
+        async function markEmailAsRead(emailId) {
+            if (!gmailAccessToken) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accessToken: gmailAccessToken,
+                        emailId: emailId
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // Update the email in our local array
+                    const email = emails.find(e => e.id === emailId);
+                    if (email) {
+                        email.isRead = true;
+                    }
+                    const filteredEmail = filteredEmails.find(e => e.id === emailId);
+                    if (filteredEmail) {
+                        filteredEmail.isRead = true;
+                    }
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error marking email as read:', error);
+            }
         }
 
         // Render email detail
@@ -833,6 +869,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        accessToken: gmailAccessToken,
                         emailId: selectedEmail.id,
                         replyType: 'quick'
                     })
@@ -841,33 +878,54 @@
                 const result = await response.json();
                 if (result.success) {
                     showComposeModal(result.data);
+                } else {
+                    console.error('AI reply generation failed:', result.error);
+                    alert('Failed to generate reply: ' + result.error);
                 }
             } catch (error) {
                 console.error('Error generating reply:', error);
+                alert('Error generating reply: ' + error.message);
             }
         }
 
         async function archiveEmail() {
             if (!selectedEmail) return;
             
-            // Implement archive functionality
-            console.log('Archiving email:', selectedEmail.id);
-            
-            // Remove from current view with animation
-            const emailItem = document.querySelector(`[data-index="${currentEmailIndex}"]`);
-            if (emailItem) {
-                emailItem.style.transform = 'translateX(100%)';
-                emailItem.style.opacity = '0';
-                setTimeout(() => {
-                    filteredEmails.splice(currentEmailIndex, 1);
-                    renderEmailList();
-                    if (currentEmailIndex >= filteredEmails.length) {
-                        currentEmailIndex = Math.max(0, filteredEmails.length - 1);
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/bulk-action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accessToken: gmailAccessToken,
+                        emailIds: [selectedEmail.id],
+                        action: 'archive'
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // Remove from current view with animation
+                    const emailItem = document.querySelector(`[data-index="${currentEmailIndex}"]`);
+                    if (emailItem) {
+                        emailItem.style.transform = 'translateX(100%)';
+                        emailItem.style.opacity = '0';
+                        setTimeout(() => {
+                            filteredEmails.splice(currentEmailIndex, 1);
+                            renderEmailList();
+                            if (currentEmailIndex >= filteredEmails.length) {
+                                currentEmailIndex = Math.max(0, filteredEmails.length - 1);
+                            }
+                            if (filteredEmails[currentEmailIndex]) {
+                                selectEmail(currentEmailIndex);
+                            }
+                        }, 200);
                     }
-                    if (filteredEmails[currentEmailIndex]) {
-                        selectEmail(currentEmailIndex);
-                    }
-                }, 200);
+                } else {
+                    alert('Failed to archive email: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error archiving email:', error);
+                alert('Error archiving email: ' + error.message);
             }
         }
 
@@ -876,8 +934,41 @@
             
             // Show confirmation
             if (confirm('Delete this email? This action cannot be undone.')) {
-                console.log('Deleting email:', selectedEmail.id);
-                archiveEmail(); // Same animation for now
+                try {
+                    const response = await fetch(`${API_BASE}/api/gmail/delete-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            accessToken: gmailAccessToken,
+                            emailId: selectedEmail.id
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        // Remove from current view with animation
+                        const emailItem = document.querySelector(`[data-index="${currentEmailIndex}"]`);
+                        if (emailItem) {
+                            emailItem.style.transform = 'translateX(100%)';
+                            emailItem.style.opacity = '0';
+                            setTimeout(() => {
+                                filteredEmails.splice(currentEmailIndex, 1);
+                                renderEmailList();
+                                if (currentEmailIndex >= filteredEmails.length) {
+                                    currentEmailIndex = Math.max(0, filteredEmails.length - 1);
+                                }
+                                if (filteredEmails[currentEmailIndex]) {
+                                    selectEmail(currentEmailIndex);
+                                }
+                            }, 200);
+                        }
+                    } else {
+                        alert('Failed to delete email: ' + result.error);
+                    }
+                } catch (error) {
+                    console.error('Error deleting email:', error);
+                    alert('Error deleting email: ' + error.message);
+                }
             }
         }
 
@@ -903,6 +994,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        accessToken: gmailAccessToken,
                         emailId: selectedEmail.id,
                         replyType: 'detailed'
                     })
@@ -911,9 +1003,13 @@
                 const result = await response.json();
                 if (result.success) {
                     showComposeModal(result.data);
+                } else {
+                    console.error('AI reply generation failed:', result.error);
+                    alert('Failed to generate AI reply: ' + result.error);
                 }
             } catch (error) {
                 console.error('Error generating AI reply:', error);
+                alert('Error generating AI reply: ' + error.message);
             }
         }
 
@@ -940,25 +1036,25 @@
                     <div class="p-6 space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
-                            <input type="email" value="${data.to || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                            <input type="email" id="composeTo" value="${data.to || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-                            <input type="text" value="${data.subject || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                            <input type="text" id="composeSubject" value="${data.subject || ''}" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
-                            <textarea rows="8" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">${data.body || ''}</textarea>
+                            <textarea id="composeBody" rows="8" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">${data.body || ''}</textarea>
                         </div>
                         <div class="flex justify-between items-center pt-4">
-                            <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            <button onclick="enhanceWithAI()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
                                 🤖 AI Enhance
                             </button>
                             <div class="space-x-3">
                                 <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100">
                                     Cancel
                                 </button>
-                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                                <button onclick="sendEmail()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                                     Send
                                 </button>
                             </div>
@@ -968,6 +1064,65 @@
             `;
             
             document.body.appendChild(modal);
+        }
+
+        async function sendEmail() {
+            const to = document.getElementById('composeTo').value;
+            const subject = document.getElementById('composeSubject').value;
+            const body = document.getElementById('composeBody').value;
+            
+            if (!to || !subject || !body) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            if (!gmailAccessToken) {
+                alert('Gmail not connected. Please connect Gmail first.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/gmail/send-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accessToken: gmailAccessToken,
+                        to,
+                        subject,
+                        content: body
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('Email sent successfully!');
+                    document.querySelector('.fixed').remove();
+                    // Refresh emails
+                    loadEmails();
+                } else {
+                    alert('Failed to send email: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error sending email:', error);
+                alert('Error sending email: ' + error.message);
+            }
+        }
+
+        async function enhanceWithAI() {
+            const body = document.getElementById('composeBody').value;
+            if (!body) {
+                alert('Please enter some text to enhance');
+                return;
+            }
+            
+            try {
+                // This would call an AI enhancement service
+                // For now, just show a placeholder
+                alert('AI enhancement feature coming soon!');
+            } catch (error) {
+                console.error('Error enhancing with AI:', error);
+                alert('Error enhancing with AI: ' + error.message);
+            }
         }
 
         function refreshEmails() {

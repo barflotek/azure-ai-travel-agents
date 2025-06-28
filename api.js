@@ -531,18 +531,29 @@ app.post('/api/gmail/bulk-action', async (req, res) => {
     const { accessToken, emailIds, action } = req.body;
     
     if (!accessToken || !emailIds || !action) {
-      return res.json({ status: 'error', message: 'Missing required parameters' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters: accessToken, emailIds, and action' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const result = await emailAgent.performBulkAction(emailIds, action);
     
-    res.json({ status: 'success', result });
+    res.json({ 
+      success: true, 
+      result 
+    });
   } catch (error) {
     console.error('Bulk action error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to perform bulk action' 
+    });
   }
 });
 
@@ -657,18 +668,29 @@ app.post('/api/gmail/ai-suggestions', async (req, res) => {
     const { accessToken, emails } = req.body;
     
     if (!accessToken || !emails) {
-      return res.json({ status: 'error', message: 'Missing required parameters' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters: accessToken and emails' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const suggestions = emailAgent.generateAISuggestions(emails);
     
-    res.json({ status: 'success', suggestions });
+    res.json({ 
+      success: true, 
+      suggestions 
+    });
   } catch (error) {
     console.error('AI suggestions error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to generate AI suggestions' 
+    });
   }
 });
 
@@ -677,18 +699,34 @@ app.post('/api/gmail/ai-reply', async (req, res) => {
     const { accessToken, emailId, replyType = 'quick' } = req.body;
     
     if (!accessToken || !emailId) {
-      return res.json({ status: 'error', message: 'Missing required parameters' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters: accessToken and emailId' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const reply = await emailAgent.generateAIReply(emailId, replyType);
     
-    res.json({ status: 'success', reply });
+    // Return the format expected by the Superhuman interface
+    res.json({ 
+      success: true, 
+      data: {
+        to: reply.originalEmail?.from || '',
+        subject: reply.subject || `Re: ${reply.originalEmail?.subject || 'Email'}`,
+        body: reply.body || 'Error generating reply'
+      }
+    });
   } catch (error) {
     console.error('AI reply error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to generate AI reply' 
+    });
   }
 });
 
@@ -697,18 +735,29 @@ app.post('/api/gmail/analytics', async (req, res) => {
     const { accessToken } = req.body;
     
     if (!accessToken) {
-      return res.json({ status: 'error', message: 'Missing access token' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing access token' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const analytics = await emailAgent.getEmailAnalytics();
     
-    res.json({ status: 'success', analytics });
+    res.json({ 
+      success: true, 
+      analytics 
+    });
   } catch (error) {
     console.error('Analytics error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to get email analytics' 
+    });
   }
 });
 
@@ -717,18 +766,29 @@ app.post('/api/gmail/mark-read', async (req, res) => {
     const { accessToken, emailId } = req.body;
     
     if (!accessToken || !emailId) {
-      return res.json({ status: 'error', message: 'Missing required parameters' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters: accessToken and emailId' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const success = await emailAgent.markEmailAsRead(emailId);
     
-    res.json({ status: success ? 'success' : 'error', message: success ? 'Email marked as read' : 'Failed to mark email as read' });
+    res.json({ 
+      success: success, 
+      message: success ? 'Email marked as read' : 'Failed to mark email as read' 
+    });
   } catch (error) {
     console.error('Mark as read error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to mark email as read' 
+    });
   }
 });
 
@@ -737,18 +797,29 @@ app.post('/api/gmail/delete-email', async (req, res) => {
     const { accessToken, emailId } = req.body;
     
     if (!accessToken || !emailId) {
-      return res.json({ status: 'error', message: 'Missing required parameters' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters: accessToken and emailId' 
+      });
     }
 
-    const emailAgent = new EmailAgent('user-1');
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
     emailAgent.setGmailAccess(accessToken);
     
     const success = await emailAgent.deleteEmail(emailId);
     
-    res.json({ status: success ? 'success' : 'error', message: success ? 'Email deleted' : 'Failed to delete email' });
+    res.json({ 
+      success: success, 
+      message: success ? 'Email deleted' : 'Failed to delete email' 
+    });
   } catch (error) {
     console.error('Delete email error:', error);
-    res.json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to delete email' 
+    });
   }
 });
 
