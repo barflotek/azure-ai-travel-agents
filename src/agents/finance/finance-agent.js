@@ -1,5 +1,5 @@
-import { SmartLLMRouter } from '../../llm';
-import { SupabaseClient } from '../../database';
+import { SmartLLMRouter } from '../../llm/index.js';
+import { SupabaseClient } from '../../database/index.js';
 export class FinanceAgent {
     constructor(userId) {
         this.userId = userId;

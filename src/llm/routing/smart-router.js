@@ -1,5 +1,5 @@
-import { OllamaProvider } from '../providers/ollama';
-import { GroqProvider } from '../providers/groq';
+import { OllamaProvider } from '../providers/ollama.js';
+import { GroqProvider } from '../providers/groq.js';
 export class SmartLLMRouter {
     constructor() {
         this.ollama = new OllamaProvider();

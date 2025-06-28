@@ -1,9 +1,9 @@
-import { EmailAgent } from './email/email-agent';
-import { FinanceAgent } from './finance/finance-agent';
-import { SocialAgent } from './social/social-agent';
-import { CustomerAgent } from './customer/customer-agent';
-import { SmartLLMRouter } from '../llm';
-import { SupabaseClient } from '../database';
+import { EmailAgent } from './email/email-agent.js';
+import { FinanceAgent } from './finance/finance-agent.js';
+import { SocialAgent } from './social/social-agent.js';
+import { CustomerAgent } from './customer/customer-agent.js';
+import { SmartLLMRouter } from '../llm/index.js';
+import { SupabaseClient } from '../database/index.js';
 export class BusinessAgentOrchestrator {
     constructor(userId) {
         this.userId = userId;

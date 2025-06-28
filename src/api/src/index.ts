@@ -7,6 +7,7 @@ import {
   FinanceAgent, 
   SocialAgent, 
   CustomerAgent, 
+  KnowledgeAgent,
   BusinessAgentOrchestrator 
 } from '../../agents';
 import { SmartLLMRouter } from '../../llm';
@@ -201,6 +202,36 @@ app.post('/api/customer', async (req, res) => {
     res.status(500).json({
       status: 'error',
       agent: 'customer',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.post('/api/knowledge', async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    
+    if (!userId || !task) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'userId and task are required'
+      });
+    }
+    
+    const knowledgeAgent = new KnowledgeAgent(userId);
+    const result = await knowledgeAgent.processTask(task);
+    
+    res.json({
+      status: 'success',
+      agent: 'knowledge',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      agent: 'knowledge',
       message: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     });

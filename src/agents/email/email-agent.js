@@ -1,6 +1,6 @@
-import { SmartLLMRouter } from '../../llm';
-import { SupabaseClient } from '../../database';
-import { GmailClient } from '../../integrations/gmail/gmail-client';
+import { SmartLLMRouter } from '../../llm/index.js';
+import { SupabaseClient } from '../../database/index.js';
+import { GmailClient } from '../../integrations/gmail/gmail-client.js';
 export class EmailAgent {
     constructor(userId) {
         this.userId = userId;

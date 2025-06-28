@@ -2,22 +2,23 @@ import { EmailAgent } from './email/email-agent';
 import { FinanceAgent } from './finance/finance-agent';
 import { SocialAgent } from './social/social-agent';
 import { CustomerAgent } from './customer/customer-agent';
+import { KnowledgeAgent } from './knowledge/knowledge-agent';
 import { SmartLLMRouter, LLMMessage } from '../llm';
 import { SupabaseClient } from '../database';
 
 export interface BusinessTask {
   id?: string;
-  type: 'multi_agent' | 'single_agent';
+  type: 'multi_agent' | 'single_agent' | 'email' | 'finance' | 'social' | 'customer' | 'knowledge';
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  requiredAgents?: ('email' | 'finance' | 'social' | 'customer')[];
+  requiredAgents?: ('email' | 'finance' | 'social' | 'customer' | 'knowledge')[];
   context?: any;
   deadline?: string;
   userId: string;
 }
 
 export interface AgentTaskPlan {
-  agentType: 'email' | 'finance' | 'social' | 'customer';
+  agentType: 'email' | 'finance' | 'social' | 'customer' | 'knowledge';
   taskType: string;
   taskData: any;
   dependencies?: string[];
@@ -30,6 +31,7 @@ export class BusinessAgentOrchestrator {
   private financeAgent: FinanceAgent;
   private socialAgent: SocialAgent;
   private customerAgent: CustomerAgent;
+  private knowledgeAgent: KnowledgeAgent;
   private llmRouter: SmartLLMRouter;
   private userId: string;
 
@@ -39,6 +41,7 @@ export class BusinessAgentOrchestrator {
     this.financeAgent = new FinanceAgent(userId);
     this.socialAgent = new SocialAgent(userId);
     this.customerAgent = new CustomerAgent(userId);
+    this.knowledgeAgent = new KnowledgeAgent(userId);
     this.llmRouter = new SmartLLMRouter();
   }
 
@@ -124,6 +127,7 @@ Available Agents:
 2. FINANCE AGENT - Categorize expenses, generate reports, analyze transactions, budget forecasts, generate invoices
 3. SOCIAL AGENT - Create posts, schedule content, analyze engagement, respond to comments, hashtag research, competitor analysis
 4. CUSTOMER AGENT - Respond to inquiries, categorize tickets, escalate issues, follow up, satisfaction surveys, knowledge base search
+5. KNOWLEDGE AGENT - Answer questions, provide insights, and generate knowledge-based responses
 
 Create a step-by-step execution plan:
 1. Identify which agents are needed
@@ -135,7 +139,7 @@ Create a step-by-step execution plan:
 Format as JSON array with this structure:
 [
   {
-    "agentType": "email|finance|social|customer",
+    "agentType": "email|finance|social|customer|knowledge",
     "taskType": "specific_task_name",
     "taskData": { "task_specific_data": "here" },
     "dependencies": ["previous_step_ids"],
@@ -238,6 +242,9 @@ Return ONLY the JSON array, no additional text.
       
       case 'customer':
         return await this.customerAgent.processTask(step.taskData);
+      
+      case 'knowledge':
+        return await this.knowledgeAgent.processTask(step.taskData);
       
       default:
         throw new Error(`Unknown agent type: ${step.agentType}`);
@@ -354,6 +361,16 @@ Format as a professional business report.
       });
     }
 
+    if (description.includes('knowledge')) {
+      plan.push({
+        agentType: 'knowledge',
+        taskType: 'answer_question',
+        taskData: { question: task.description },
+        priority: task.priority,
+        estimatedDuration: '5 minutes'
+      });
+    }
+
     // If no specific agents identified, default to customer service
     if (plan.length === 0) {
       plan.push({
@@ -376,7 +393,8 @@ Format as a professional business report.
       email: { total: 0, successful: 0 },
       finance: { total: 0, successful: 0 },
       social: { total: 0, successful: 0 },
-      customer: { total: 0, successful: 0 }
+      customer: { total: 0, successful: 0 },
+      knowledge: { total: 0, successful: 0 }
     };
 
     results.forEach(result => {
@@ -449,7 +467,8 @@ Format as a professional business report.
         email: 'active',
         finance: 'active',
         social: 'active',
-        customer: 'active'
+        customer: 'active',
+        knowledge: 'active'
       },
       llmProviders: status,
       userId: this.userId,

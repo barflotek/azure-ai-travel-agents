@@ -3,5 +3,5 @@
 // - supabase: Supabase client configuration and connection management
 // - schemas: Database schema definitions and migrations
 // Database exports
-export * from './supabase/client';
-export { supabase, SupabaseClient } from './supabase/client';
+export * from './supabase/client.js';
+export { supabase, SupabaseClient } from './supabase/client.js';
