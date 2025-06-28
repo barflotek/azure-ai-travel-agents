@@ -378,14 +378,35 @@
             try {
                 showEmailListSkeleton();
                 
-                const response = await fetch(`${API_BASE}/api/gmail/emails?accessToken=${encodeURIComponent(gmailAccessToken)}`);
-                const data = await response.json();
+                const startTime = Date.now();
                 
-                if (data.success) {
-                    emails = data.emails || [];
+                // Use the fast loading endpoint for better performance
+                const response = await fetch(`${API_BASE}/api/gmail/emails-fast`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        accessToken: gmailAccessToken,
+                        maxResults: 50
+                    })
+                });
+                
+                const data = await response.json();
+                const loadTime = Date.now() - startTime;
+                
+                console.log(`✅ Emails loaded in ${loadTime}ms`);
+                
+                if (data.status === 'success') {
+                    emails = data.result.recentEmails || [];
                     filteredEmails = categories[currentCategory].filter();
                     renderEmailList();
                     updateStats();
+                    
+                    // Show performance indicator
+                    if (loadTime < 1000) {
+                        showNotification(`Loaded ${emails.length} emails in ${loadTime}ms`, 'success');
+                    }
                 } else {
                     // Check if re-authentication is required
                     if (data.requiresReauth || data.error?.includes('expired') || data.error?.includes('invalid')) {

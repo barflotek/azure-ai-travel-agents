@@ -114,12 +114,18 @@ export class EmailAgent {
       throw new Error('Gmail not connected. Please authenticate first.');
     }
 
-    const emails = await this.gmailClient.getRecentEmails(50);
+    console.log('🚀 Starting optimized email check...');
+    
+    // Use the faster list method for initial load
+    const emails = await this.gmailClient.getEmailList(50);
     const unreadEmails = emails.filter(email => !email.isRead);
 
-    // Summarize unread emails with AI
+    console.log(`📧 Loaded ${emails.length} emails (${unreadEmails.length} unread)`);
+
+    // Only summarize a few unread emails to avoid performance issues
+    const emailsToSummarize = unreadEmails.slice(0, 5); // Limit to 5 emails
     const summaries = await Promise.all(
-      unreadEmails.map(email => this.summarizeRealEmail(email))
+      emailsToSummarize.map(email => this.summarizeRealEmail(email))
     );
 
     return {
@@ -128,8 +134,8 @@ export class EmailAgent {
       summaries,
       recentEmails: emails.map(email => ({
         id: email.id,
-        from: email.from,
-        subject: email.subject,
+        from: email.from || this.extractFromFromSnippet(email.snippet),
+        subject: email.subject || this.extractSubjectFromSnippet(email.snippet),
         date: email.date,
         body: email.body,
         snippet: email.snippet,
@@ -139,6 +145,91 @@ export class EmailAgent {
         category: this.categorizeEmail(email)
       }))
     };
+  }
+
+  // Fast email loading without AI processing
+  async getEmailsFast(maxResults: number = 50): Promise<GmailCheckResult> {
+    if (!this.gmailClient) {
+      throw new Error('Gmail not connected. Please authenticate first.');
+    }
+
+    console.log(`🚀 Fast loading ${maxResults} emails...`);
+    
+    const emails = await this.gmailClient.getEmailList(maxResults);
+    const unreadEmails = emails.filter(email => !email.isRead);
+
+    console.log(`✅ Fast load complete: ${emails.length} emails`);
+
+    return {
+      totalEmails: emails.length,
+      unreadCount: unreadEmails.length,
+      summaries: [], // No AI processing for speed
+      recentEmails: emails.map(email => ({
+        id: email.id,
+        from: email.from || this.extractFromFromSnippet(email.snippet),
+        subject: email.subject || this.extractSubjectFromSnippet(email.snippet),
+        date: email.date,
+        body: email.body,
+        snippet: email.snippet,
+        isRead: email.isRead,
+        labels: email.labels,
+        priority: this.calculatePriority(email),
+        category: this.categorizeEmail(email)
+      }))
+    };
+  }
+
+  // Progressive loading - load basic info first, then details on demand
+  async getEmailsProgressive(maxResults: number = 50): Promise<GmailCheckResult> {
+    if (!this.gmailClient) {
+      throw new Error('Gmail not connected. Please authenticate first.');
+    }
+
+    console.log(`🚀 Progressive loading ${maxResults} emails...`);
+    
+    // First, get basic list quickly
+    const basicEmails = await this.gmailClient.getEmailList(maxResults);
+    const unreadEmails = basicEmails.filter(email => !email.isRead);
+
+    console.log(`📧 Basic info loaded, processing ${basicEmails.length} emails...`);
+
+    // Process emails with basic info first
+    const processedEmails = basicEmails.map(email => ({
+      id: email.id,
+      from: email.from || this.extractFromFromSnippet(email.snippet),
+      subject: email.subject || this.extractSubjectFromSnippet(email.snippet),
+      date: email.date,
+      body: email.body,
+      snippet: email.snippet,
+      isRead: email.isRead,
+      labels: email.labels,
+      priority: this.calculatePriority(email),
+      category: this.categorizeEmail(email)
+    }));
+
+    return {
+      totalEmails: processedEmails.length,
+      unreadCount: unreadEmails.length,
+      summaries: [], // Will be loaded on demand
+      recentEmails: processedEmails
+    };
+  }
+
+  // Helper methods for extracting info from snippets
+  private extractFromFromSnippet(snippet: string | undefined): string {
+    if (!snippet) return 'Unknown Sender';
+    
+    // Try to extract sender from snippet if available
+    const fromMatch = snippet.match(/From:\s*([^\n]+)/i);
+    return fromMatch ? fromMatch[1].trim() : 'Unknown Sender';
+  }
+
+  private extractSubjectFromSnippet(snippet: string | undefined): string {
+    if (!snippet) return 'No Subject';
+    
+    // Try to extract subject from snippet if available
+    const subjectMatch = snippet.match(/Subject:\s*([^\n]+)/i);
+    return subjectMatch ? subjectMatch[1].trim() : snippet.substring(0, 50) + '...';
   }
 
   async sendRealEmail(task: EmailTask): Promise<SendEmailResult> {

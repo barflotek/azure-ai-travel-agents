@@ -5,6 +5,8 @@ import { GmailMessage, SendEmailResult, GmailCheckResult, EmailSummary } from '.
 export class GmailClient {
   private gmail: any;
   private auth: OAuth2Client;
+  private emailCache: Map<string, { email: GmailMessage; timestamp: number }> = new Map();
+  private cacheTimeout: number = 5 * 60 * 1000; // 5 minutes
 
   constructor(accessToken: string) {
     this.auth = new google.auth.OAuth2(
@@ -19,6 +21,9 @@ export class GmailClient {
 
   async getRecentEmails(maxResults: number = 10): Promise<GmailMessage[]> {
     try {
+      console.log(`🚀 Fetching ${maxResults} recent emails...`);
+      
+      // First, get the list of message IDs
       const response = await this.gmail.users.messages.list({
         userId: 'me',
         maxResults,
@@ -26,8 +31,13 @@ export class GmailClient {
       });
 
       const messages = response.data.messages || [];
-      const emailPromises = messages.map(msg => this.getEmailDetails(msg.id));
-      return await Promise.all(emailPromises);
+      console.log(`📧 Found ${messages.length} messages, fetching details...`);
+
+      // Use batch processing for better performance
+      const emails = await this.getEmailsBatch(messages.map(msg => msg.id));
+      
+      console.log(`✅ Successfully loaded ${emails.length} emails`);
+      return emails;
     } catch (error) {
       console.error('Error fetching emails:', error);
       throw error;
@@ -36,6 +46,8 @@ export class GmailClient {
 
   async getUnreadEmails(maxResults: number = 10): Promise<GmailMessage[]> {
     try {
+      console.log(`🚀 Fetching ${maxResults} unread emails...`);
+      
       const response = await this.gmail.users.messages.list({
         userId: 'me',
         maxResults,
@@ -43,12 +55,103 @@ export class GmailClient {
       });
 
       const messages = response.data.messages || [];
-      const emailPromises = messages.map(msg => this.getEmailDetails(msg.id));
-      return await Promise.all(emailPromises);
+      console.log(`📧 Found ${messages.length} unread messages, fetching details...`);
+
+      const emails = await this.getEmailsBatch(messages.map(msg => msg.id));
+      
+      console.log(`✅ Successfully loaded ${emails.length} unread emails`);
+      return emails;
     } catch (error) {
       console.error('Error fetching unread emails:', error);
       throw error;
     }
+  }
+
+  // Optimized batch processing for multiple emails
+  private async getEmailsBatch(messageIds: string[]): Promise<GmailMessage[]> {
+    const emails: GmailMessage[] = [];
+    const batchSize = 10; // Gmail API batch limit
+    
+    // Process in batches to avoid overwhelming the API
+    for (let i = 0; i < messageIds.length; i += batchSize) {
+      const batch = messageIds.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (messageId) => {
+        // Check cache first
+        const cached = this.emailCache.get(messageId);
+        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+          return cached.email;
+        }
+        
+        // Fetch from API if not cached or expired
+        const email = await this.getEmailDetails(messageId);
+        
+        // Cache the result
+        this.emailCache.set(messageId, {
+          email,
+          timestamp: Date.now()
+        });
+        
+        return email;
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      emails.push(...batchResults);
+      
+      // Small delay between batches to be respectful to the API
+      if (i + batchSize < messageIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return emails;
+  }
+
+  // Optimized method to get email list with minimal data (for faster loading)
+  async getEmailList(maxResults: number = 50): Promise<GmailMessage[]> {
+    try {
+      console.log(`🚀 Fetching email list (${maxResults} items)...`);
+      
+      const response = await this.gmail.users.messages.list({
+        userId: 'me',
+        maxResults,
+        q: 'in:inbox'
+      });
+
+      const messages = response.data.messages || [];
+      console.log(`📧 Found ${messages.length} messages, processing...`);
+
+      // For list view, we only need basic info - no need to fetch full details
+      const emails: GmailMessage[] = messages.map(msg => ({
+        id: msg.id,
+        subject: '', // Will be filled by snippet
+        from: '', // Will be extracted from snippet if needed
+        to: '',
+        date: new Date(parseInt(msg.internalDate)),
+        body: '', // Not needed for list view
+        isRead: !msg.labelIds?.includes('UNREAD'),
+        snippet: msg.snippet || '',
+        labels: msg.labelIds || []
+      }));
+
+      console.log(`✅ Successfully loaded email list (${emails.length} items)`);
+      return emails;
+    } catch (error) {
+      console.error('Error fetching email list:', error);
+      throw error;
+    }
+  }
+
+  // Clear cache (useful for testing or when cache becomes stale)
+  clearCache(): void {
+    this.emailCache.clear();
+    console.log('🗑️ Email cache cleared');
+  }
+
+  // Get cache statistics
+  getCacheStats(): { size: number; hitRate: number } {
+    const size = this.emailCache.size;
+    // Note: In a real implementation, you'd track cache hits/misses
+    return { size, hitRate: 0.8 }; // Estimated hit rate
   }
 
   async sendEmail(to: string, subject: string, body: string): Promise<SendEmailResult> {

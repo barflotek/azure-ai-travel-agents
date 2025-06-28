@@ -107,6 +107,119 @@ app.post('/api/gmail/check-emails', async (req, res) => {
   }
 });
 
+// Fast email loading endpoint (no AI processing)
+app.post('/api/gmail/emails-fast', async (req, res) => {
+  try {
+    const { accessToken, maxResults = 50 } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Gmail access token required'
+      });
+    }
+
+    console.log('🚀 Fast email loading requested...');
+    
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.getEmailsFast(maxResults);
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'emails_fast',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail fast emails error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to load emails',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Progressive email loading endpoint
+app.post('/api/gmail/emails-progressive', async (req, res) => {
+  try {
+    const { accessToken, maxResults = 50 } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Gmail access token required'
+      });
+    }
+
+    console.log('🚀 Progressive email loading requested...');
+    
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.getEmailsProgressive(maxResults);
+    
+    res.json({
+      status: 'success',
+      agent: 'email',
+      task: 'emails_progressive',
+      result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail progressive emails error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to load emails',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Cache management endpoint
+app.post('/api/gmail/clear-cache', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+    
+    if (!accessToken) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Gmail access token required'
+      });
+    }
+
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    // Clear the cache
+    if (emailAgent['gmailClient']) {
+      emailAgent['gmailClient'].clearCache();
+    }
+    
+    res.json({
+      status: 'success',
+      message: 'Email cache cleared successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail clear cache error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to clear cache',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.post('/api/gmail/send-email', async (req, res) => {
   try {
     const { accessToken, to, subject, content } = req.body;
