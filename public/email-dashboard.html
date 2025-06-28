@@ -277,6 +277,44 @@
         html.dark .prose {
             color: #f8fafc !important;
         }
+
+        /* Ultra-aggressive dark mode fixes for email modal */
+        [data-theme="dark"] #emailModal,
+        [data-theme="dark"] #emailModal *,
+        [data-theme="dark"] #emailModalContent,
+        [data-theme="dark"] #emailModalContent *,
+        [data-theme="dark"] .email-modal-content,
+        [data-theme="dark"] .email-modal-content *,
+        html.dark #emailModal,
+        html.dark #emailModal *,
+        html.dark #emailModalContent,
+        html.dark #emailModalContent *,
+        html.dark .email-modal-content,
+        html.dark .email-modal-content * {
+            color: #f8fafc !important;
+        }
+
+        /* Force white text for any content inside email modal */
+        [data-theme="dark"] #emailModalContent div,
+        [data-theme="dark"] #emailModalContent p,
+        [data-theme="dark"] #emailModalContent span,
+        [data-theme="dark"] #emailModalContent .email-body,
+        [data-theme="dark"] #emailModalContent .prose,
+        [data-theme="dark"] #emailModalContent .prose *,
+        html.dark #emailModalContent div,
+        html.dark #emailModalContent p,
+        html.dark #emailModalContent span,
+        html.dark #emailModalContent .email-body,
+        html.dark #emailModalContent .prose,
+        html.dark #emailModalContent .prose * {
+            color: #f8fafc !important;
+        }
+
+        /* Override any inline styles that might be set */
+        [data-theme="dark"] #emailModalContent [style*="color"],
+        html.dark #emailModalContent [style*="color"] {
+            color: #f8fafc !important;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -1548,6 +1586,29 @@
             `;
 
             document.getElementById('emailModal').classList.remove('hidden');
+            
+            // Force apply dark mode styles after modal opens
+            setTimeout(() => {
+                forceDarkModeStyles();
+            }, 100);
+        }
+
+        // Force apply dark mode styles to email modal
+        function forceDarkModeStyles() {
+            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+            if (isDarkMode) {
+                const modalContent = document.getElementById('emailModalContent');
+                if (modalContent) {
+                    // Force white text on all elements
+                    const allElements = modalContent.querySelectorAll('*');
+                    allElements.forEach(element => {
+                        element.style.color = '#f8fafc';
+                    });
+                    
+                    // Force white text on the modal content itself
+                    modalContent.style.color = '#f8fafc';
+                }
+            }
         }
 
         function closeEmailModal() {
@@ -2024,6 +2085,25 @@
         
         // Initialize theme when page loads
         document.addEventListener('DOMContentLoaded', initializeTheme);
+        
+        // Additional theme enforcement
+        function enforceDarkMode() {
+            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+            console.log('Current theme:', isDarkMode ? 'dark' : 'light');
+            
+            if (isDarkMode) {
+                // Force dark mode styles on all email-related elements
+                const emailElements = document.querySelectorAll('.email-body, .email-preview, .prose, .email-modal-content');
+                emailElements.forEach(element => {
+                    element.style.color = '#f8fafc';
+                });
+            }
+        }
+        
+        // Run theme enforcement after page loads
+        window.addEventListener('load', () => {
+            setTimeout(enforceDarkMode, 500);
+        });
     </script>
 </body>
 </html> 
