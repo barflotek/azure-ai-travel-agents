@@ -185,11 +185,13 @@
             color: var(--text-secondary) !important;
         }
 
-        /* Dark mode specific overrides */
+        /* Dark mode specific overrides - more forceful */
+        .dark .email-body,
         [data-theme="dark"] .email-body {
             color: #f8fafc !important;
         }
 
+        .dark .email-preview,
         [data-theme="dark"] .email-preview {
             color: #cbd5e1 !important;
         }
@@ -203,6 +205,33 @@
         /* Smooth transitions */
         * {
             transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        /* Additional dark mode fixes */
+        .dark .prose-invert,
+        [data-theme="dark"] .prose-invert {
+            color: #f8fafc !important;
+        }
+
+        .dark .prose-invert p,
+        [data-theme="dark"] .prose-invert p {
+            color: #f8fafc !important;
+        }
+
+        /* Force white text in dark mode for all email content */
+        .dark #emailModalContent,
+        [data-theme="dark"] #emailModalContent {
+            color: #f8fafc !important;
+        }
+
+        .dark #emailModalContent *,
+        [data-theme="dark"] #emailModalContent * {
+            color: inherit !important;
+        }
+
+        .dark #emailModalContent .email-body,
+        [data-theme="dark"] #emailModalContent .email-body {
+            color: #f8fafc !important;
         }
     </style>
 </head>
@@ -885,6 +914,10 @@
             const startTime = Date.now();
 
             try {
+                console.log('🚀 Starting email refresh...');
+                console.log('API_BASE:', API_BASE);
+                console.log('Gmail token available:', !!gmailAccessToken);
+                
                 // Use the fast loading endpoint for better performance
                 const result = await apiCall('/api/gmail/emails-fast', 'POST', {
                     accessToken: gmailAccessToken,
@@ -892,9 +925,11 @@
                 });
 
                 const loadTime = Date.now() - startTime;
+                console.log('📧 API response:', result);
 
                 if (result.status === 'success') {
                     emails = result.result.recentEmails || [];
+                    console.log(`✅ Loaded ${emails.length} emails`);
                     updateEmailList();
                     updateStats();
                     
@@ -922,6 +957,7 @@
                         generateAISuggestions();
                     }, 100);
                 } else {
+                    console.error('❌ API returned error:', result);
                     emailListDiv.innerHTML = `
                         <div class="text-center text-red-500 py-8">
                             <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
@@ -931,11 +967,17 @@
                     showNotification(`Failed to load emails: ${result.message}`, 'error');
                 }
             } catch (error) {
-                console.error('Error loading emails:', error);
+                console.error('❌ Error loading emails:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
                 emailListDiv.innerHTML = `
                     <div class="text-center text-red-500 py-8">
                         <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
                         <p>Error loading emails: ${error.message}</p>
+                        <p class="text-sm mt-2">Check console for details</p>
                     </div>
                 `;
                 showNotification(`Error loading emails: ${error.message}`, 'error');
@@ -1443,6 +1485,11 @@
 
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
+                console.log(`🌐 API Call: ${method} ${API_BASE}${endpoint}`);
+                if (data) {
+                    console.log('📤 Request data:', data);
+                }
+                
                 const config = {
                     method,
                     headers: {
@@ -1453,10 +1500,31 @@
                     config.body = JSON.stringify(data);
                 }
                 
-                const response = await fetch(`${API_BASE}${endpoint}`, config);
-                return await response.json();
+                const url = `${API_BASE}${endpoint}`;
+                console.log('🔗 Full URL:', url);
+                
+                const response = await fetch(url, config);
+                console.log('📥 Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('📦 Response data:', result);
+                return result;
             } catch (error) {
-                return { error: error.message };
+                console.error('❌ API Call failed:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+                return { 
+                    status: 'error',
+                    message: error.message || 'Network error',
+                    error: error.message 
+                };
             }
         }
 
