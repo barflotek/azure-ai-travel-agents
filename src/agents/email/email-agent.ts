@@ -114,7 +114,7 @@ export class EmailAgent {
       throw new Error('Gmail not connected. Please authenticate first.');
     }
 
-    const emails = await this.gmailClient.getRecentEmails(10);
+    const emails = await this.gmailClient.getRecentEmails(50);
     const unreadEmails = emails.filter(email => !email.isRead);
 
     // Summarize unread emails with AI
@@ -126,12 +126,17 @@ export class EmailAgent {
       totalEmails: emails.length,
       unreadCount: unreadEmails.length,
       summaries,
-      recentEmails: emails.slice(0, 5).map(email => ({
+      recentEmails: emails.map(email => ({
+        id: email.id,
         from: email.from,
         subject: email.subject,
         date: email.date,
-        preview: email.body.substring(0, 100) + '...',
-        isRead: email.isRead
+        body: email.body,
+        snippet: email.snippet,
+        isRead: email.isRead,
+        labels: email.labels,
+        priority: this.calculatePriority(email),
+        category: this.categorizeEmail(email)
       }))
     };
   }

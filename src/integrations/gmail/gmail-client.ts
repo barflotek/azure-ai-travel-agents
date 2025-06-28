@@ -240,21 +240,46 @@ export class GmailClient {
   }
 
   private extractEmailBody(payload: any): string {
+    // Handle simple body
     if (payload.body?.data) {
-      return Buffer.from(payload.body.data, 'base64').toString();
+      return Buffer.from(payload.body.data, 'base64').toString('utf-8');
     }
 
+    // Handle multipart emails
     if (payload.parts) {
+      let body = '';
+      
+      // First try to find text/plain
       for (const part of payload.parts) {
-        if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
-          return Buffer.from(part.body.data, 'base64').toString();
-        }
-        // Recursively check nested parts
-        if (part.parts) {
-          const nestedBody = this.extractEmailBody(part);
-          if (nestedBody) return nestedBody;
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+          break;
         }
       }
+      
+      // If no text/plain, try text/html
+      if (!body) {
+        for (const part of payload.parts) {
+          if (part.mimeType === 'text/html' && part.body?.data) {
+            body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+            // Strip HTML tags for plain text
+            body = body.replace(/<[^>]*>/g, '');
+            break;
+          }
+        }
+      }
+      
+      // If still no body, recursively check nested parts
+      if (!body) {
+        for (const part of payload.parts) {
+          if (part.parts) {
+            body = this.extractEmailBody(part);
+            if (body) break;
+          }
+        }
+      }
+      
+      return body;
     }
 
     return '';

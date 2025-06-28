@@ -53,11 +53,16 @@ export interface GmailCheckResult {
   unreadCount: number;
   summaries: EmailSummary[];
   recentEmails: Array<{
+    id: string;
     from: string;
     subject: string;
     date: Date;
-    preview: string;
+    body: string;
+    snippet?: string;
     isRead: boolean;
+    labels?: string[];
+    priority: 'high' | 'medium' | 'low';
+    category: string;
   }>;
 }
 
