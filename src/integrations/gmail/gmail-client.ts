@@ -120,19 +120,49 @@ export class GmailClient {
       const messages = response.data.messages || [];
       console.log(`📧 Found ${messages.length} messages, processing...`);
 
-      // For list view, we only need basic info - no need to fetch full details
-      const emails: GmailMessage[] = messages.map(msg => ({
-        id: msg.id,
-        subject: '', // Will be filled by snippet
-        from: '', // Will be extracted from snippet if needed
-        to: '',
-        date: new Date(parseInt(msg.internalDate)),
-        body: '', // Not needed for list view
-        isRead: !msg.labelIds?.includes('UNREAD'),
-        snippet: msg.snippet || '',
-        labels: msg.labelIds || []
-      }));
+      // Fetch full message details to get headers (from, subject)
+      const emailPromises = messages.map(async (msg) => {
+        try {
+          const messageResponse = await this.gmail.users.messages.get({
+            userId: 'me',
+            id: msg.id,
+            format: 'metadata',
+            metadataHeaders: ['From', 'Subject', 'To', 'Date']
+          });
 
+          const headers = messageResponse.data.payload?.headers || [];
+          const getHeader = (name: string) => 
+            headers.find((h: any) => h.name === name)?.value || '';
+
+          return {
+            id: msg.id,
+            subject: getHeader('Subject') || 'No Subject',
+            from: getHeader('From') || 'Unknown Sender',
+            to: getHeader('To') || '',
+            date: new Date(parseInt(msg.internalDate)),
+            body: '', // Not needed for list view
+            isRead: !msg.labelIds?.includes('UNREAD'),
+            snippet: msg.snippet || '',
+            labels: msg.labelIds || []
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch details for message ${msg.id}:`, error);
+          // Fallback with basic info
+          return {
+            id: msg.id,
+            subject: 'No Subject',
+            from: 'Unknown Sender',
+            to: '',
+            date: new Date(parseInt(msg.internalDate)),
+            body: '',
+            isRead: !msg.labelIds?.includes('UNREAD'),
+            snippet: msg.snippet || '',
+            labels: msg.labelIds || []
+          };
+        }
+      });
+
+      const emails = await Promise.all(emailPromises);
       console.log(`✅ Successfully loaded email list (${emails.length} items)`);
       return emails;
     } catch (error) {

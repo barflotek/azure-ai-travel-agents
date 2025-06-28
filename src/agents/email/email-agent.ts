@@ -166,8 +166,8 @@ export class EmailAgent {
       summaries: [], // No AI processing for speed
       recentEmails: emails.map(email => ({
         id: email.id,
-        from: email.from || this.extractFromFromSnippet(email.snippet),
-        subject: email.subject || this.extractSubjectFromSnippet(email.snippet),
+        from: email.from,
+        subject: email.subject,
         date: email.date,
         body: email.body,
         snippet: email.snippet,
