@@ -1,0 +1,22 @@
+{
+  "name": "ollama-service",
+  "description": "Ollama LLM service for Azure AI Travel Agents",
+  "services": [
+    {
+      "name": "ollama",
+      "image": "ollama/ollama:latest",
+      "ports": ["11434"],
+      "environment": {
+        "OLLAMA_HOST": "0.0.0.0",
+        "OLLAMA_ORIGINS": "*"
+      },
+      "volumes": {
+        "ollama_data": "/root/.ollama"
+      }
+    }
+  ],
+  "variables": {
+    "OLLAMA_BASE_URL": "https://ollama-service-production.up.railway.app",
+    "LOCAL_LLM_ENABLED": "true"
+  }
+} 
