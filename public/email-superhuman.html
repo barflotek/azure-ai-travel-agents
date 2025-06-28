@@ -200,6 +200,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
                         </button>
+                        <button onclick="clearCache()" class="p-2 text-gray-600 hover:text-gray-900" title="Clear cache">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 
@@ -251,6 +256,105 @@
         let currentCategory = 0;
         let filteredEmails = [];
         let gmailAccessToken = null;
+        let isLoading = false;
+        
+        // Email cache for performance
+        const emailCache = {
+            data: null,
+            timestamp: null,
+            ttl: 5 * 60 * 1000, // 5 minutes
+            
+            set(emails) {
+                this.data = emails;
+                this.timestamp = Date.now();
+                localStorage.setItem('emailCache', JSON.stringify({
+                    data: emails,
+                    timestamp: this.timestamp
+                }));
+            },
+            
+            get() {
+                if (!this.data || !this.timestamp) {
+                    const cached = localStorage.getItem('emailCache');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        this.data = parsed.data;
+                        this.timestamp = parsed.timestamp;
+                    }
+                }
+                
+                if (this.data && this.timestamp && (Date.now() - this.timestamp) < this.ttl) {
+                    return this.data;
+                }
+                return null;
+            },
+            
+            clear() {
+                this.data = null;
+                this.timestamp = null;
+                localStorage.removeItem('emailCache');
+            }
+        };
+        
+        // API helper function
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            
+            const response = await fetch(`${API_BASE}${endpoint}`, options);
+            return await response.json();
+        }
+        
+        // Notification system
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.textContent = message;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+        
+        // Enhanced error handling
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+        
+        function showLoading() {
+            const statusDiv = document.getElementById('gmailStatus');
+            if (statusDiv) {
+                statusDiv.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <span>Loading emails...</span>
+                    </div>
+                `;
+            }
+        }
         
         // Categories
         const categories = [
@@ -393,56 +497,140 @@
         // Load emails from API
         async function loadEmails() {
             if (!gmailAccessToken) {
-                updateGmailStatus(false, 'Please connect Gmail first');
+                showNotification('Please connect Gmail first', 'error');
                 return;
             }
 
+            if (isLoading) {
+                console.log('Already loading emails...');
+                return;
+            }
+
+            // Check cache first
+            const cached = emailCache.get();
+            if (cached) {
+                console.log('📦 Using cached emails');
+                emails = cached;
+                filteredEmails = categories[currentCategory].filter();
+                renderEmailList();
+                updateStats();
+                return;
+            }
+
+            isLoading = true;
+            showLoading();
+            
+            // Show loading state with performance indicator
+            const emailListContainer = document.getElementById('emailListContainer');
+            if (!emailListContainer) {
+                console.error('Email list container not found');
+                isLoading = false;
+                return;
+            }
+            
+            emailListContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p class="text-gray-600">Loading emails...</p>
+                    <p class="text-sm text-gray-500 mt-2">Using optimized loading for faster display</p>
+                </div>
+            `;
+
+            const startTime = Date.now();
+
             try {
-                showEmailListSkeleton();
+                console.log('🚀 Starting email refresh...');
+                console.log('API_BASE:', API_BASE);
+                console.log('Gmail token available:', !!gmailAccessToken);
                 
-                const startTime = Date.now();
-                
-                // Use the fast loading endpoint for better performance
-                const response = await fetch(`${API_BASE}/api/gmail/emails-fast`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        accessToken: gmailAccessToken,
-                        maxResults: 50
-                    })
+                // Try the check-emails endpoint first (more reliable)
+                const result = await apiCall('/api/gmail/check-emails', 'POST', {
+                    accessToken: gmailAccessToken
                 });
-                
-                const data = await response.json();
+
                 const loadTime = Date.now() - startTime;
-                
-                console.log(`✅ Emails loaded in ${loadTime}ms`);
-                
-                if (data.status === 'success') {
-                    emails = data.result.recentEmails || [];
+                console.log('📧 API response:', result);
+
+                if (result.status === 'success' && result.result) {
+                    emails = result.result.recentEmails || [];
+                    console.log(`✅ Loaded ${emails.length} emails`);
+                    
+                    // Cache the results
+                    emailCache.set(emails);
+                    
                     filteredEmails = categories[currentCategory].filter();
                     renderEmailList();
                     updateStats();
                     
                     // Show performance indicator
+                    console.log(`✅ Emails loaded in ${loadTime}ms`);
+                    
+                    // Update loading message with performance info
                     if (loadTime < 1000) {
                         showNotification(`Loaded ${emails.length} emails in ${loadTime}ms`, 'success');
                     }
                 } else {
+                    console.error('❌ API returned error:', result);
+                    
                     // Check if re-authentication is required
-                    if (data.requiresReauth || data.error?.includes('expired') || data.error?.includes('invalid')) {
+                    if (result.requiresReauth || result.error?.includes('expired') || result.error?.includes('invalid')) {
                         console.log('Token expired or invalid, clearing and requesting re-authentication');
                         clearGmailToken();
                         updateGmailStatus(false, 'Gmail session expired. Please reconnect.');
-                        showErrorState('Gmail session expired. Please click "Connect Gmail" to reconnect.');
+                        showNotification('Gmail session expired. Please reconnect.', 'error');
+                        emailListContainer.innerHTML = `
+                            <div class="text-center py-8">
+                                <div class="text-red-500 mb-4">
+                                    <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <p class="text-gray-600 font-medium">Gmail session expired</p>
+                                <p class="text-sm text-gray-500 mt-2">Please reconnect your Gmail account</p>
+                                <button onclick="connectGmail()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                                    Reconnect Gmail
+                                </button>
+                            </div>
+                        `;
                     } else {
-                        showErrorState(data.error || 'Failed to load emails');
+                        emailListContainer.innerHTML = `
+                            <div class="text-center py-8">
+                                <div class="text-red-500 mb-4">
+                                    <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <p class="text-gray-600 font-medium">Failed to load emails</p>
+                                <p class="text-sm text-gray-500 mt-2">${result.message || 'Unknown error occurred'}</p>
+                                <button onclick="loadEmails()" class="mt-4 text-sm text-blue-600 hover:text-blue-800">Try again</button>
+                            </div>
+                        `;
+                        showNotification(`Failed to load emails: ${result.message || 'Invalid response format'}`, 'error');
                     }
                 }
             } catch (error) {
-                console.error('Error loading emails:', error);
-                showErrorState('Network error: ' + error.message);
+                console.error('❌ Error loading emails:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+                
+                emailListContainer.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-red-500 mb-4">
+                            <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-600 font-medium">Network error</p>
+                        <p class="text-sm text-gray-500 mt-2">${error.message}</p>
+                        <button onclick="loadEmails()" class="mt-4 text-sm text-blue-600 hover:text-blue-800">Try again</button>
+                    </div>
+                `;
+                showNotification(`Error loading emails: ${error.message}`, 'error');
+            } finally {
+                isLoading = false;
             }
         }
 
@@ -907,11 +1095,11 @@
                     showComposeModal(result.data);
                 } else {
                     console.error('AI reply generation failed:', result.error);
-                    alert('Failed to generate reply: ' + result.error);
+                    showNotification('Failed to generate reply: ' + result.error, 'error');
                 }
             } catch (error) {
                 console.error('Error generating reply:', error);
-                alert('Error generating reply: ' + error.message);
+                showNotification('Error generating reply: ' + error.message, 'error');
             }
         }
 
@@ -948,11 +1136,11 @@
                         }, 200);
                     }
                 } else {
-                    alert('Failed to archive email: ' + result.error);
+                    showNotification('Failed to archive email: ' + result.error, 'error');
                 }
             } catch (error) {
                 console.error('Error archiving email:', error);
-                alert('Error archiving email: ' + error.message);
+                showNotification('Error archiving email: ' + error.message, 'error');
             }
         }
 
@@ -990,11 +1178,11 @@
                             }, 200);
                         }
                     } else {
-                        alert('Failed to delete email: ' + result.error);
+                        showNotification('Failed to delete email: ' + result.error, 'error');
                     }
                 } catch (error) {
                     console.error('Error deleting email:', error);
-                    alert('Error deleting email: ' + error.message);
+                    showNotification('Error deleting email: ' + error.message, 'error');
                 }
             }
         }
@@ -1032,11 +1220,11 @@
                     showComposeModal(result.data);
                 } else {
                     console.error('AI reply generation failed:', result.error);
-                    alert('Failed to generate AI reply: ' + result.error);
+                    showNotification('Failed to generate AI reply: ' + result.error, 'error');
                 }
             } catch (error) {
                 console.error('Error generating AI reply:', error);
-                alert('Error generating AI reply: ' + error.message);
+                showNotification('Error generating AI reply: ' + error.message, 'error');
             }
         }
 
@@ -1099,12 +1287,12 @@
             const body = document.getElementById('composeBody').value;
             
             if (!to || !subject || !body) {
-                alert('Please fill in all fields');
+                showNotification('Please fill in all fields', 'error');
                 return;
             }
             
             if (!gmailAccessToken) {
-                alert('Gmail not connected. Please connect Gmail first.');
+                showNotification('Gmail not connected. Please connect Gmail first.', 'error');
                 return;
             }
             
@@ -1122,38 +1310,46 @@
                 
                 const result = await response.json();
                 if (result.status === 'success') {
-                    alert('Email sent successfully!');
+                    showNotification('Email sent successfully!', 'success');
                     document.querySelector('.fixed').remove();
                     // Refresh emails
                     loadEmails();
                 } else {
-                    alert('Failed to send email: ' + result.message);
+                    showNotification('Failed to send email: ' + result.message, 'error');
                 }
             } catch (error) {
                 console.error('Error sending email:', error);
-                alert('Error sending email: ' + error.message);
+                showNotification('Error sending email: ' + error.message, 'error');
             }
         }
 
         async function enhanceWithAI() {
             const body = document.getElementById('composeBody').value;
             if (!body) {
-                alert('Please enter some text to enhance');
+                showNotification('Please enter some text to enhance', 'error');
                 return;
             }
             
             try {
                 // This would call an AI enhancement service
                 // For now, just show a placeholder
-                alert('AI enhancement feature coming soon!');
+                showNotification('AI enhancement feature coming soon!', 'info');
             } catch (error) {
                 console.error('Error enhancing with AI:', error);
-                alert('Error enhancing with AI: ' + error.message);
+                showNotification('Error enhancing with AI: ' + error.message, 'error');
             }
         }
 
         function refreshEmails() {
+            // Clear cache to force fresh load
+            emailCache.clear();
+            showNotification('Refreshing emails...', 'info');
             loadEmails();
+        }
+
+        function clearCache() {
+            emailCache.clear();
+            showNotification('Cache cleared', 'success');
         }
 
         // Initialize the interface
