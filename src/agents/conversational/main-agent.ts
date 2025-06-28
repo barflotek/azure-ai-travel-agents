@@ -1,4 +1,5 @@
-import { SmartLLMRouter, LLMMessage } from '../../llm';
+import { SmartLLMRouter } from '../../llm';
+import type { LLMMessage } from '../../llm';
 import { EmailAgent } from '../email/email-agent';
 import { FinanceAgent } from '../finance/finance-agent';
 import { SocialAgent } from '../social/social-agent';
@@ -443,5 +444,19 @@ What would you like to work on today?
    */
   private generateMessageId(): string {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Get LLM provider status and recommendations
+   */
+  async getLLMStatus() {
+    return await this.llmRouter.getProviderStatus();
+  }
+
+  /**
+   * Set email agent (for dependency injection)
+   */
+  setEmailAgent(emailAgent: EmailAgent) {
+    this.emailAgent = emailAgent;
   }
 } 

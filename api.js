@@ -912,6 +912,25 @@ app.get('/api/tts/usage', (req, res) => {
   });
 });
 
+// LLM Provider Status endpoint
+app.get('/api/llm/status', async (req, res) => {
+  try {
+    const status = await conversationalAgent.getLLMStatus();
+    res.json({
+      success: true,
+      status,
+      message: 'LLM provider status retrieved successfully'
+    });
+  } catch (error) {
+    console.error('LLM status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Failed to get LLM provider status'
+    });
+  }
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -948,7 +967,8 @@ app.use('*', (req, res) => {
       'POST /api/gmail/delete-email',
       'GET /api/config',
       'POST /api/tts/elevenlabs',
-      'GET /api/tts/usage'
+      'GET /api/tts/usage',
+      'GET /api/llm/status'
     ],
     timestamp: new Date().toISOString()
   });

@@ -13,7 +13,12 @@ export class OllamaProvider {
   async chat(messages: any[]) {
     try {
       const response = await this.ollama.chat({ messages });
-      return response;
+      return {
+        message: {
+          content: response.message?.content || "",
+          role: "assistant"
+        }
+      };
     } catch (error) {
       console.error("Ollama error:", error);
       throw error;
