@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Business Knowledge Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">📚 Business Knowledge Agent</h1>
+            <p class="text-gray-600">Your AI advisor trained on your business books and documents</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left: Document Library -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">📁 Document Library</h2>
+                    
+                    <!-- Upload Area -->
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6 text-center">
+                        <input type="file" id="pdfUpload" accept=".pdf" multiple class="hidden">
+                        <button onclick="document.getElementById('pdfUpload').click()" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            📄 Upload PDF Books
+                        </button>
+                        <p class="text-sm text-gray-500 mt-2">Upload your business books, guides, and documents</p>
+                    </div>
+
+                    <!-- Document List -->
+                    <div id="documentList" class="space-y-3">
+                        <div class="text-gray-500 text-center py-4">
+                            No documents uploaded yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle: Knowledge Chat -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6 h-96 flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4">🧠 Ask Your Knowledge Agent</h2>
+                    
+                    <!-- Chat Messages -->
+                    <div id="chatMessages" class="flex-1 overflow-y-auto space-y-4 mb-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-blue-800">👋 Hello! I'm your business knowledge advisor. Upload some PDF books and I'll help you with strategic decisions, marketing advice, and more!</p>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="flex space-x-2">
+                        <input type="text" id="questionInput" placeholder="Ask me anything about your business knowledge..." 
+                               class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="askQuestion()" 
+                                class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">
+                            Ask
+                        </button>
+                    </div>
+
+                    <!-- Quick Questions -->
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button onclick="askQuickQuestion('How can I improve my marketing strategy?')" 
+                                class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                            Marketing Strategy
+                        </button>
+                        <button onclick="askQuickQuestion('What are the best practices for customer acquisition?')" 
+                                class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                            Customer Acquisition
+                        </button>
+                        <button onclick="askQuickQuestion('How should I scale my business?')" 
+                                class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200">
+                            Business Scaling
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Knowledge Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                <div class="text-2xl font-bold text-blue-600" id="docCount">0</div>
+                <div class="text-gray-600">Documents</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                <div class="text-2xl font-bold text-green-600" id="chunkCount">0</div>
+                <div class="text-gray-600">Knowledge Chunks</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                <div class="text-2xl font-bold text-purple-600" id="topicCount">0</div>
+                <div class="text-gray-600">Topics Covered</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                <div class="text-2xl font-bold text-orange-600" id="queryCount">0</div>
+                <div class="text-gray-600">Questions Answered</div>
+            </div>
+        </div>
+
+        <!-- Advanced Features -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <!-- Search Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">🔍 Knowledge Search</h2>
+                <div class="flex space-x-2 mb-4">
+                    <input type="text" id="searchInput" placeholder="Search your knowledge base..." 
+                           class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <button onclick="searchKnowledge()" 
+                            class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600">
+                        Search
+                    </button>
+                </div>
+                <div id="searchResults" class="space-y-2 max-h-32 overflow-y-auto">
+                    <!-- Search results will appear here -->
+                </div>
+            </div>
+
+            <!-- Business Advice Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">💡 Business Advice</h2>
+                <textarea id="situationInput" placeholder="Describe your business situation or challenge..." 
+                          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 h-20 mb-2"></textarea>
+                <input type="text" id="goalInput" placeholder="What's your desired outcome? (optional)" 
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4">
+                <button onclick="getBusinessAdvice()" 
+                        class="w-full bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600">
+                    Get Strategic Advice
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let documents = [];
+        let queryCount = 0;
+
+        // Initialize
+        document.getElementById('pdfUpload').addEventListener('change', handleFileUpload);
+        document.getElementById('questionInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') askQuestion();
+        });
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchKnowledge();
+        });
+
+        // Load initial status
+        loadKnowledgeStatus();
+
+        async function handleFileUpload(event) {
+            const files = event.target.files;
+            for (const file of files) {
+                if (file.type === 'application/pdf') {
+                    await uploadDocument(file);
+                }
+            }
+        }
+
+        async function uploadDocument(file) {
+            const formData = new FormData();
+            formData.append('pdf', file);
+            formData.append('userId', 'default');
+            
+            try {
+                addChatMessage('system', `📄 Uploading ${file.name}...`);
+                
+                const response = await fetch(`${API_BASE}/api/knowledge/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    documents.push(result.document);
+                    updateDocumentList();
+                    updateStats();
+                    addChatMessage('system', `✅ Successfully processed ${file.name}! Added ${result.chunkCount} knowledge chunks.`);
+                    addChatMessage('assistant', `📖 Summary: ${result.summary}`);
+                } else {
+                    addChatMessage('system', `❌ Failed to upload ${file.name}: ${result.error}`);
+                }
+            } catch (error) {
+                addChatMessage('system', `❌ Error uploading ${file.name}: ${error.message}`);
+            }
+        }
+
+        async function askQuestion() {
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            input.value = '';
+            addChatMessage('user', question);
+            addChatMessage('system', '🤔 Thinking...');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        question, 
+                        userId: 'default' 
+                    })
+                });
+
+                const result = await response.json();
+                
+                // Remove thinking message
+                const messages = document.getElementById('chatMessages');
+                messages.removeChild(messages.lastElementChild);
+                
+                if (result.success) {
+                    addChatMessage('assistant', result.answer);
+                    if (result.sources && result.sources.length > 0) {
+                        const sourcesText = '📚 Sources: ' + result.sources.map(s => s.filename).join(', ');
+                        addChatMessage('sources', sourcesText);
+                    }
+                    queryCount++;
+                    updateStats();
+                } else {
+                    addChatMessage('assistant', result.answer || 'I need more knowledge to answer that question.');
+                }
+            } catch (error) {
+                addChatMessage('system', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function searchKnowledge() {
+            const input = document.getElementById('searchInput');
+            const query = input.value.trim();
+            if (!query) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query, 
+                        userId: 'default' 
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displaySearchResults(result.results);
+                } else {
+                    displaySearchResults([]);
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                displaySearchResults([]);
+            }
+        }
+
+        async function getBusinessAdvice() {
+            const situation = document.getElementById('situationInput').value.trim();
+            const goal = document.getElementById('goalInput').value.trim();
+            
+            if (!situation) {
+                alert('Please describe your business situation');
+                return;
+            }
+
+            addChatMessage('user', `Business Situation: ${situation}${goal ? ` | Goal: ${goal}` : ''}`);
+            addChatMessage('system', '💭 Analyzing and providing strategic advice...');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/advice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        situation, 
+                        goal, 
+                        userId: 'default' 
+                    })
+                });
+
+                const result = await response.json();
+                
+                // Remove thinking message
+                const messages = document.getElementById('chatMessages');
+                messages.removeChild(messages.lastElementChild);
+                
+                if (result.success) {
+                    addChatMessage('assistant', result.advice);
+                    if (result.supportingSources && result.supportingSources.length > 0) {
+                        const sourcesText = '📚 Based on: ' + result.supportingSources.join(', ');
+                        addChatMessage('sources', sourcesText);
+                    }
+                } else {
+                    addChatMessage('assistant', 'I need more knowledge to provide specific advice for your situation.');
+                }
+            } catch (error) {
+                const messages = document.getElementById('chatMessages');
+                if (messages.lastElementChild) {
+                    messages.removeChild(messages.lastElementChild);
+                }
+                addChatMessage('system', `❌ Error: ${error.message}`);
+            }
+
+            // Clear inputs
+            document.getElementById('situationInput').value = '';
+            document.getElementById('goalInput').value = '';
+        }
+
+        function askQuickQuestion(question) {
+            document.getElementById('questionInput').value = question;
+            askQuestion();
+        }
+
+        function addChatMessage(type, content) {
+            const messages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            
+            const bgColor = {
+                user: 'bg-blue-100',
+                assistant: 'bg-green-50',
+                system: 'bg-gray-100',
+                sources: 'bg-purple-50'
+            }[type] || 'bg-gray-100';
+            
+            messageDiv.className = `p-4 rounded-lg ${bgColor}`;
+            messageDiv.innerHTML = `<p class="text-gray-800">${content}</p>`;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm">No results found</div>';
+                return;
+            }
+
+            container.innerHTML = results.map(result => `
+                <div class="border-l-4 border-green-400 pl-3 py-2">
+                    <div class="font-medium text-sm">${result.filename}</div>
+                    <div class="text-gray-600 text-xs">${result.content.substring(0, 100)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function updateDocumentList() {
+            const list = document.getElementById('documentList');
+            
+            if (documents.length === 0) {
+                list.innerHTML = '<div class="text-gray-500 text-center py-4">No documents uploaded yet</div>';
+                return;
+            }
+
+            list.innerHTML = documents.map(doc => `
+                <div class="border rounded-lg p-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-medium text-gray-900">${doc.filename}</h3>
+                            <p class="text-sm text-gray-500">${doc.chunkCount} chunks • ${doc.topics.join(', ')}</p>
+                        </div>
+                        <div class="text-green-600">✓</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadKnowledgeStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/status/default`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    documents = result.documents;
+                    updateDocumentList();
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Failed to load status:', error);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('docCount').textContent = documents.length;
+            document.getElementById('chunkCount').textContent = documents.reduce((sum, doc) => sum + doc.chunkCount, 0);
+            document.getElementById('topicCount').textContent = [...new Set(documents.flatMap(doc => doc.topics))].length;
+            document.getElementById('queryCount').textContent = queryCount;
+        }
+    </script>
+</body>
+</html> 

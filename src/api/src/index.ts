@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { 
   EmailAgent, 
   FinanceAgent, 
@@ -16,6 +17,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Knowledge routes (imported dynamically to avoid path issues)
+const knowledgeRoutes = require('../../routes/knowledge-routes').default;
+app.use('/api/knowledge', knowledgeRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -35,6 +40,11 @@ app.get('/health', (req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
+});
+
+// Serve knowledge dashboard
+app.get('/knowledge', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/knowledge-dashboard.html'));
 });
 
 // Test endpoint to verify system functionality
