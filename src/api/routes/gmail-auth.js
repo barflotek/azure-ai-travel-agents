@@ -89,21 +89,21 @@ router.get('/auth/gmail/callback', async (req, res) => {
     
     console.log('  - Fresh OAuth2 client created');
     
-    const tokenResponse = await freshOAuth2Client.getAccessToken(code);
-    console.log('  - Raw token response:', JSON.stringify(tokenResponse, null, 2));
-    console.log('  - Token response type:', typeof tokenResponse);
-    console.log('  - Token response keys:', tokenResponse ? Object.keys(tokenResponse) : 'null/undefined');
+    // Use the correct method to exchange code for tokens
+    const { tokens } = await freshOAuth2Client.getToken(code);
+    console.log('  - Raw token response:', JSON.stringify(tokens, null, 2));
+    console.log('  - Token response type:', typeof tokens);
+    console.log('  - Token response keys:', tokens ? Object.keys(tokens) : 'null/undefined');
     
-    if (!tokenResponse) {
-      throw new Error('getAccessToken returned null or undefined');
+    if (!tokens) {
+      throw new Error('getToken returned null or undefined');
     }
     
-    if (!tokenResponse.tokens) {
-      console.error('  - Token response structure:', tokenResponse);
-      throw new Error('Token response missing "tokens" property');
+    if (!tokens.access_token) {
+      console.error('  - Token response structure:', tokens);
+      throw new Error('Token response missing "access_token" property');
     }
     
-    const { tokens } = tokenResponse;
     console.log('✅ Gmail OAuth completed successfully');
     console.log('  - Access token:', tokens.access_token ? '✅ Present' : '❌ Missing');
     console.log('  - Refresh token:', tokens.refresh_token ? '✅ Present' : '❌ Missing');
