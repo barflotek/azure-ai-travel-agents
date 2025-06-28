@@ -557,8 +557,144 @@
             
             // Add scroll listener for infinite loading
             const emailListContainer = document.getElementById('emailList');
-            emailListContainer.addEventListener('scroll', throttle(handleScroll, 100));
+            if (emailListContainer) {
+                emailListContainer.addEventListener('scroll', throttle(handleScroll, 100));
+            }
         });
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.textContent = message;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+
+        // Gmail token management
+        function loadGmailToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const accessToken = urlParams.get('access_token');
+            const refreshToken = urlParams.get('refresh_token');
+            
+            if (accessToken) {
+                gmailAccessToken = accessToken;
+                if (refreshToken) {
+                    localStorage.setItem('gmail_refresh_token', refreshToken);
+                }
+                localStorage.setItem('gmail_access_token', accessToken);
+                showNotification('✅ Gmail connected successfully!', 'success');
+                
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                // Try to load from localStorage
+                const storedToken = localStorage.getItem('gmail_access_token');
+                if (storedToken) {
+                    gmailAccessToken = storedToken;
+                    updateGmailStatus(true, 'Gmail is connected');
+                } else {
+                    updateGmailStatus(false, 'Please connect Gmail');
+                }
+            }
+        }
+
+        function checkGmailAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gmailAuth = urlParams.get('gmail_auth');
+            
+            if (gmailAuth === 'success') {
+                const accessToken = urlParams.get('access_token');
+                const refreshToken = urlParams.get('refresh_token');
+                
+                if (accessToken) {
+                    gmailAccessToken = accessToken;
+                    if (refreshToken) {
+                        localStorage.setItem('gmail_refresh_token', refreshToken);
+                    }
+                    localStorage.setItem('gmail_access_token', accessToken);
+                    showNotification('✅ Gmail connected successfully!', 'success');
+                    updateGmailStatus(true, 'Gmail is connected');
+                    
+                    // Clean up URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } else if (gmailAuth === 'error') {
+                const error = urlParams.get('error');
+                showNotification(`❌ Gmail authentication failed: ${error}`, 'error');
+                updateGmailStatus(false, 'Authentication failed');
+                
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        function updateGmailStatus(connected, message) {
+            const statusDiv = document.getElementById('gmailStatus');
+            const actionsDiv = document.getElementById('gmailActions');
+            
+            if (statusDiv) {
+                if (connected) {
+                    statusDiv.innerHTML = `<span class="text-green-600">✅ ${message}</span>`;
+                } else {
+                    statusDiv.innerHTML = `<span class="text-red-600">❌ ${message}</span>`;
+                }
+            }
+            
+            if (actionsDiv) {
+                if (connected) {
+                    actionsDiv.classList.remove('hidden');
+                } else {
+                    actionsDiv.classList.add('hidden');
+                }
+            }
+        }
+
+        function clearGmailToken() {
+            gmailAccessToken = null;
+            localStorage.removeItem('gmail_access_token');
+            localStorage.removeItem('gmail_refresh_token');
+            updateGmailStatus(false, 'Gmail disconnected');
+            showNotification('🔌 Gmail disconnected', 'info');
+        }
+
+        function connectGmail() {
+            fetch(`${API_BASE}/api/auth/gmail`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.authUrl;
+                    } else {
+                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
+                        showNotification('❌ Failed to start Gmail authentication', 'error');
+                    }
+                })
+                .catch(error => {
+                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
+                    showNotification('❌ Error starting Gmail authentication', 'error');
+                });
+        }
+
+        function disconnectGmail() {
+            clearGmailToken();
+            emails = [];
+            selectedEmails.clear();
+            updateEmailList();
+            updateStats();
+        }
 
         async function loadConfiguration() {
             try {
@@ -655,103 +791,10 @@
             }
         }
 
-        // Gmail Integration Functions
-        function loadGmailToken() {
-            const savedToken = localStorage.getItem('gmailAccessToken');
-            if (savedToken) {
-                gmailAccessToken = savedToken;
-                updateGmailStatus(true, 'Gmail connected (from saved session)');
-                return true;
-            }
-            return false;
-        }
-
-        function saveGmailToken(token) {
-            gmailAccessToken = token;
-            localStorage.setItem('gmailAccessToken', token);
-        }
-
-        function clearGmailToken() {
-            gmailAccessToken = null;
-            localStorage.removeItem('gmailAccessToken');
-        }
-
-        function connectGmail() {
-            fetch(`${API_BASE}/api/auth/gmail`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.href = data.authUrl;
-                    } else {
-                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
-                });
-        }
-
-        function checkGmailAuthCallback() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const gmailAuth = urlParams.get('gmail_auth');
-            
-            if (gmailAuth === 'success') {
-                const accessToken = urlParams.get('access_token');
-                if (accessToken) {
-                    saveGmailToken(accessToken);
-                    updateGmailStatus(true, 'Gmail connected successfully!');
-                    
-                    // Clean up URL parameters
-                    const cleanUrl = window.location.pathname;
-                    window.history.replaceState({}, document.title, cleanUrl);
-                    
-                    // Refresh emails
-                    refreshEmails();
-                }
-            } else if (gmailAuth === 'error') {
-                const error = urlParams.get('error');
-                updateGmailStatus(false, 'Gmail authentication failed: ' + (error || 'Unknown error'));
-                
-                // Clean up URL parameters
-                const cleanUrl = window.location.pathname;
-                window.history.replaceState({}, document.title, cleanUrl);
-            }
-        }
-
-        function updateGmailStatus(connected, message) {
-            const statusDiv = document.getElementById('gmailStatus');
-            const actionsDiv = document.getElementById('gmailActions');
-            
-            if (connected) {
-                statusDiv.innerHTML = `<span class="text-green-600">✅ ${message}</span>`;
-                actionsDiv.innerHTML = `
-                    <button onclick="disconnectGmail()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                        <i class="fas fa-unlink mr-2"></i>Disconnect
-                    </button>
-                `;
-            } else {
-                statusDiv.innerHTML = `<span class="text-red-600">❌ ${message}</span>`;
-                actionsDiv.innerHTML = `
-                    <button onclick="connectGmail()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                        <i class="fab fa-google mr-2"></i>Connect Gmail
-                    </button>
-                `;
-            }
-        }
-
-        function disconnectGmail() {
-            clearGmailToken();
-            updateGmailStatus(false, 'Gmail disconnected');
-            emails = [];
-            selectedEmails.clear();
-            updateEmailList();
-            updateStats();
-        }
-
         // Email Management Functions
         async function refreshEmails() {
             if (!gmailAccessToken) {
-                alert('Please connect Gmail first');
+                showNotification('Please connect Gmail first', 'error');
                 return;
             }
 
@@ -764,6 +807,12 @@
             
             // Show loading state with performance indicator
             const emailListDiv = document.getElementById('emailList');
+            if (!emailListDiv) {
+                console.error('Email list container not found');
+                isLoading = false;
+                return;
+            }
+            
             emailListDiv.innerHTML = `
                 <div class="text-center text-secondary py-8">
                     <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
@@ -818,14 +867,17 @@
                             <p>Failed to load emails: ${result.message}</p>
                         </div>
                     `;
+                    showNotification(`Failed to load emails: ${result.message}`, 'error');
                 }
             } catch (error) {
+                console.error('Error loading emails:', error);
                 emailListDiv.innerHTML = `
                     <div class="text-center text-red-500 py-8">
                         <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
                         <p>Error loading emails: ${error.message}</p>
                     </div>
                 `;
+                showNotification(`Error loading emails: ${error.message}`, 'error');
             } finally {
                 isLoading = false;
             }
