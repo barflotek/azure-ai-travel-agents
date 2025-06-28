@@ -625,26 +625,84 @@
 
         // Gmail Integration Functions
         function connectGmail() {
-            const authWindow = window.open(
-                `${API_BASE}/api/auth/gmail`,
-                'gmail-auth',
-                'width=500,height=600,scrollbars=yes,resizable=yes'
-            );
+            // Get the auth URL from the server
+            fetch(`${API_BASE}/api/auth/gmail`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Open the auth URL in a new window
+                        const authWindow = window.open(
+                            data.authUrl,
+                            'gmail-auth',
+                            'width=600,height=700,scrollbars=yes,resizable=yes'
+                        );
+                        
+                        document.getElementById('gmailStatus').innerHTML = '<span class="text-blue-600">Opening Gmail authentication...</span>';
+                        
+                        // Show instructions for desktop app flow
+                        const instructions = `
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                                <h4 class="font-semibold text-blue-800 mb-2">📋 Gmail Authorization Instructions:</h4>
+                                <ol class="text-sm text-blue-700 space-y-1">
+                                    <li>1. Complete the authorization in the popup window</li>
+                                    <li>2. Copy the authorization code from the success page</li>
+                                    <li>3. Paste the code below and click "Complete Authorization"</li>
+                                </ol>
+                                <div class="mt-3">
+                                    <input type="text" id="authCode" placeholder="Paste authorization code here" 
+                                           class="w-full p-2 border rounded text-sm">
+                                    <button onclick="completeGmailAuth()" 
+                                            class="mt-2 bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
+                                        Complete Authorization
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        document.getElementById('gmailStatus').insertAdjacentHTML('afterend', instructions);
+                    } else {
+                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
+                });
+        }
+        
+        function completeGmailAuth() {
+            const authCode = document.getElementById('authCode').value.trim();
             
-            document.getElementById('gmailStatus').innerHTML = '<span class="text-blue-600">Opening Gmail authentication...</span>';
+            if (!authCode) {
+                alert('Please paste the authorization code');
+                return;
+            }
             
-            // Listen for auth completion
-            window.addEventListener('message', function(event) {
-                if (event.origin !== API_BASE) return;
-                
-                if (event.data.type === 'gmail_auth_success') {
-                    gmailAccessToken = event.data.tokens.access_token;
+            // Send the authorization code to the server
+            fetch(`${API_BASE}/api/auth/gmail/callback`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: authCode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    gmailAccessToken = data.tokens.access_token;
                     updateGmailStatus(true, 'Gmail connected successfully!');
-                    authWindow.close();
-                } else if (event.data.type === 'gmail_auth_error') {
-                    updateGmailStatus(false, 'Gmail authentication failed');
-                    authWindow.close();
+                    
+                    // Remove the instructions
+                    const instructions = document.querySelector('.bg-blue-50');
+                    if (instructions) instructions.remove();
+                    
+                    // Clear the auth code input
+                    document.getElementById('authCode').value = '';
+                } else {
+                    updateGmailStatus(false, 'Gmail authentication failed: ' + data.error);
                 }
+            })
+            .catch(error => {
+                updateGmailStatus(false, 'Error completing Gmail authentication: ' + error.message);
             });
         }
         

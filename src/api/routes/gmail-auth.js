@@ -3,31 +3,18 @@ import { google } from 'googleapis';
 
 const router = express.Router();
 
-// Get the correct redirect URI based on environment
-const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    // Use Railway URL in production
-    return process.env.RAILWAY_PUBLIC_DOMAIN 
-      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/auth/gmail/callback`
-      : process.env.GMAIL_REDIRECT_URI;
-  }
-  return process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback';
-};
-
-const redirectUri = getRedirectUri();
-
 console.log('🔧 Gmail OAuth Configuration:');
 console.log('  - Client ID:', process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing');
 console.log('  - Client Secret:', process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
-console.log('  - Redirect URI:', redirectUri);
+console.log('  - OAuth Type: Desktop Application');
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GMAIL_CLIENT_ID,
   process.env.GMAIL_CLIENT_SECRET,
-  redirectUri
+  'urn:ietf:wg:oauth:2.0:oob' // Special URI for desktop apps
 );
 
-// Start Gmail OAuth flow
+// Start Gmail OAuth flow for desktop app
 router.get('/auth/gmail', (req, res) => {
   if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
     return res.status(500).json({
@@ -45,82 +32,29 @@ router.get('/auth/gmail', (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
-    prompt: 'consent', // Force consent to get refresh token
-    redirect_uri: redirectUri // Explicitly set redirect URI
+    prompt: 'consent' // Force consent to get refresh token
   });
 
-  console.log('🔐 Starting Gmail OAuth flow...');
-  console.log('  - Redirect URI:', redirectUri);
+  console.log('🔐 Starting Gmail OAuth flow for desktop app...');
   console.log('  - Auth URL:', url);
   
-  res.redirect(url);
+  // Return the auth URL for the frontend to open
+  res.json({
+    success: true,
+    authUrl: url,
+    message: 'Please open this URL in your browser to authorize Gmail access'
+  });
 });
 
-// Handle Gmail OAuth callback
-router.get('/auth/gmail/callback', async (req, res) => {
-  const { code, error } = req.query;
-  
-  if (error) {
-    console.error('❌ Gmail OAuth error:', error);
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Gmail Authentication Error</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-          .error { color: red; margin: 20px 0; }
-          .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <h2>❌ Gmail Authentication Failed</h2>
-        <div class="error">Error: ${error}</div>
-        <p>Please try again or check your Gmail OAuth configuration.</p>
-        <button class="button" onclick="window.close()">Close</button>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'gmail_auth_error',
-              error: '${error}'
-            }, '*');
-          }
-        </script>
-      </body>
-      </html>
-    `;
-    return res.send(errorHtml);
-  }
+// Handle authorization code from desktop app flow
+router.post('/auth/gmail/callback', async (req, res) => {
+  const { code } = req.body;
   
   if (!code) {
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Gmail Authentication Error</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-          .error { color: red; margin: 20px 0; }
-          .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <h2>❌ Gmail Authentication Failed</h2>
-        <div class="error">No authorization code received</div>
-        <p>Please try again.</p>
-        <button class="button" onclick="window.close()">Close</button>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'gmail_auth_error',
-              error: 'No authorization code received'
-            }, '*');
-          }
-        </script>
-      </body>
-      </html>
-    `;
-    return res.send(errorHtml);
+    return res.status(400).json({
+      success: false,
+      error: 'Authorization code is required'
+    });
   }
   
   try {
@@ -129,71 +63,20 @@ router.get('/auth/gmail/callback', async (req, res) => {
     
     console.log('✅ Gmail OAuth completed successfully');
     
-    // Return HTML that communicates with parent window
-    const successHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Gmail Authentication Success</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-          .success { color: green; margin: 20px 0; }
-          .button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <h2>✅ Gmail Connected Successfully!</h2>
-        <div class="success">Your Gmail account has been connected.</div>
-        <p>You can now close this window and use Gmail features.</p>
-        <button class="button" onclick="window.close()">Close</button>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'gmail_auth_success',
-              tokens: ${JSON.stringify(tokens)}
-            }, '*');
-          }
-          // Auto-close after 2 seconds
-          setTimeout(() => {
-            window.close();
-          }, 2000);
-        </script>
-      </body>
-      </html>
-    `;
-    
-    res.send(successHtml);
+    res.json({
+      success: true,
+      tokens,
+      message: 'Gmail connected successfully!',
+      scopes: tokens.scope?.split(' ') || []
+    });
     
   } catch (error) {
     console.error('❌ Gmail OAuth error:', error);
-    const errorHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Gmail Authentication Error</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
-          .error { color: red; margin: 20px 0; }
-          .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <h2>❌ Gmail Authentication Failed</h2>
-        <div class="error">Failed to authenticate with Gmail</div>
-        <p>Error: ${error.message}</p>
-        <button class="button" onclick="window.close()">Close</button>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'gmail_auth_error',
-              error: '${error.message}'
-            }, '*');
-          }
-        </script>
-      </body>
-      </html>
-    `;
-    res.send(errorHtml);
+    res.status(400).json({
+      success: false,
+      error: 'Failed to authenticate with Gmail',
+      details: error.message
+    });
   }
 });
 
@@ -279,7 +162,7 @@ router.get('/auth/gmail/debug', (req, res) => {
   const config = {
     clientId: process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing',
     clientSecret: process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing',
-    redirectUri: redirectUri,
+    redirectUri: 'urn:ietf:wg:oauth:2.0:oob',
     environment: process.env.NODE_ENV || 'development',
     railwayDomain: process.env.RAILWAY_PUBLIC_DOMAIN || 'Not set',
     gmailRedirectUri: process.env.GMAIL_REDIRECT_URI || 'Not set'
