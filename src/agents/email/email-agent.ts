@@ -31,13 +31,19 @@ export class EmailAgent {
   async processTask(task: EmailTask): Promise<any> {
     console.log(`📧 Email Agent processing ${task.type} task...`);
 
-    // Save conversation state
-    const conversation = await SupabaseClient.saveConversation({
-      user_id: this.userId,
-      agent_type: 'email',
-      state: { task, status: 'processing' },
-      messages: []
-    });
+    // Save conversation state (optional - Supabase might not be configured)
+    let conversation;
+    try {
+      conversation = await SupabaseClient.saveConversation({
+        user_id: this.userId,
+        agent_type: 'email',
+        state: { task, status: 'processing' },
+        messages: []
+      });
+    } catch (error) {
+      console.log('⚠️ Supabase not configured, continuing without persistence');
+      conversation = { id: 'temp-' + Date.now() };
+    }
 
     try {
       let result;
@@ -68,23 +74,35 @@ export class EmailAgent {
           throw new Error(`Unknown email task type: ${task.type}`);
       }
 
-      // Update conversation with result
-      await SupabaseClient.saveConversation({
-        ...conversation,
-        state: { task, status: 'completed', result },
-        messages: [...(conversation.messages || []), { type: 'result', content: result }]
-      });
+      // Update conversation with result (optional)
+      try {
+        if (conversation && conversation.id && !conversation.id.startsWith('temp-')) {
+          await SupabaseClient.saveConversation({
+            ...conversation,
+            state: { task, status: 'completed', result },
+            messages: [...(conversation.messages || []), { type: 'result', content: result }]
+          });
+        }
+      } catch (error) {
+        console.log('⚠️ Could not save conversation to Supabase');
+      }
 
       return result;
 
     } catch (error: any) {
       console.error('❌ Email Agent error:', error);
       
-      // Save error state
-      await SupabaseClient.saveConversation({
-        ...conversation,
-        state: { task, status: 'failed', error: error.message }
-      });
+      // Save error state (optional)
+      try {
+        if (conversation && conversation.id && !conversation.id.startsWith('temp-')) {
+          await SupabaseClient.saveConversation({
+            ...conversation,
+            state: { task, status: 'failed', error: error.message }
+          });
+        }
+      } catch (dbError) {
+        console.log('⚠️ Could not save error state to Supabase');
+      }
       
       throw error;
     }
