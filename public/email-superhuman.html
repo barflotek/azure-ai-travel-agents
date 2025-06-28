@@ -179,6 +179,20 @@
                         </button>
                     </div>
                 </div>
+                
+                <!-- Gmail Connection Status -->
+                <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span id="gmailStatus" class="text-sm text-gray-600 dark:text-gray-400">Checking Gmail connection...</span>
+                        </div>
+                        <div id="gmailActions">
+                            <button onclick="connectGmail()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                                Connect Gmail
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Email List Container -->
@@ -213,6 +227,7 @@
         let selectedEmail = null;
         let currentCategory = 0;
         let filteredEmails = [];
+        let gmailAccessToken = null;
         
         // Categories
         const categories = [
@@ -228,18 +243,121 @@
             setupKeyboardShortcuts();
             setupCommandPalette();
             setupDarkMode();
-            loadEmails();
+            checkGmailAuthCallback();
+            loadGmailToken();
+            checkGmailConnection();
             
             // Set up category tab styles
             updateCategoryTabs();
         }
 
+        // Gmail Authentication Functions
+        function loadGmailToken() {
+            gmailAccessToken = localStorage.getItem('gmailAccessToken');
+        }
+
+        function saveGmailToken(token) {
+            gmailAccessToken = token;
+            localStorage.setItem('gmailAccessToken', token);
+        }
+
+        function clearGmailToken() {
+            gmailAccessToken = null;
+            localStorage.removeItem('gmailAccessToken');
+        }
+
+        function connectGmail() {
+            fetch(`${API_BASE}/api/auth/gmail`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.authUrl;
+                    } else {
+                        updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    updateGmailStatus(false, 'Error starting Gmail authentication: ' + error.message);
+                });
+        }
+
+        function disconnectGmail() {
+            clearGmailToken();
+            updateGmailStatus(false, 'Gmail disconnected');
+            emails = [];
+            filteredEmails = [];
+            renderEmailList();
+            updateStats();
+        }
+
+        function checkGmailAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gmailAuth = urlParams.get('gmail_auth');
+            
+            if (gmailAuth === 'success') {
+                const accessToken = urlParams.get('access_token');
+                if (accessToken) {
+                    saveGmailToken(accessToken);
+                    updateGmailStatus(true, 'Gmail connected successfully!');
+                    
+                    // Clean up URL parameters
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                    
+                    // Load emails
+                    loadEmails();
+                }
+            } else if (gmailAuth === 'error') {
+                const error = urlParams.get('error');
+                updateGmailStatus(false, 'Gmail authentication failed: ' + (error || 'Unknown error'));
+                
+                // Clean up URL parameters
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
+        function checkGmailConnection() {
+            if (gmailAccessToken) {
+                updateGmailStatus(true, 'Gmail connected');
+                loadEmails();
+            } else {
+                updateGmailStatus(false, 'Gmail not connected');
+            }
+        }
+
+        function updateGmailStatus(connected, message) {
+            const statusDiv = document.getElementById('gmailStatus');
+            const actionsDiv = document.getElementById('gmailActions');
+            
+            if (connected) {
+                statusDiv.innerHTML = `<span class="text-green-600">✅ ${message}</span>`;
+                actionsDiv.innerHTML = `
+                    <button onclick="disconnectGmail()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                        Disconnect
+                    </button>
+                `;
+            } else {
+                statusDiv.innerHTML = `<span class="text-red-600">❌ ${message}</span>`;
+                actionsDiv.innerHTML = `
+                    <button onclick="connectGmail()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                        Connect Gmail
+                    </button>
+                `;
+            }
+        }
+
         // Load emails from API
         async function loadEmails() {
+            if (!gmailAccessToken) {
+                updateGmailStatus(false, 'Please connect Gmail first');
+                return;
+            }
+
             try {
                 showEmailListSkeleton();
                 
-                const response = await fetch(`${API_BASE}/api/gmail/emails`);
+                const response = await fetch(`${API_BASE}/api/gmail/emails?accessToken=${encodeURIComponent(gmailAccessToken)}`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -248,11 +366,11 @@
                     renderEmailList();
                     updateStats();
                 } else {
-                    showErrorState();
+                    showErrorState(data.error || 'Failed to load emails');
                 }
             } catch (error) {
                 console.error('Error loading emails:', error);
-                showErrorState();
+                showErrorState('Network error: ' + error.message);
             }
         }
 
@@ -656,7 +774,7 @@
             container.innerHTML = skeletonItems;
         }
 
-        function showErrorState() {
+        function showErrorState(message) {
             const container = document.getElementById('emailListContainer');
             container.innerHTML = `
                 <div class="flex-1 flex items-center justify-center">
@@ -664,7 +782,7 @@
                         <svg class="w-12 h-12 text-red-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <p class="text-gray-500 dark:text-gray-400 font-medium">Failed to load emails</p>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">${message}</p>
                         <button onclick="loadEmails()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Try again</button>
                     </div>
                 </div>

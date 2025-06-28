@@ -546,6 +546,42 @@ app.post('/api/gmail/bulk-action', async (req, res) => {
   }
 });
 
+// GET endpoint for emails (for Superhuman interface)
+app.get('/api/gmail/emails', async (req, res) => {
+  try {
+    // Get access token from query parameter or headers
+    const accessToken = req.query.accessToken || req.headers['x-access-token'];
+    
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Access token required. Please connect Gmail first.'
+      });
+    }
+
+    // Import and use Email Agent with Gmail
+    const { EmailAgent } = await import('./src/agents/email/email-agent.ts');
+    const emailAgent = new EmailAgent('gmail-user');
+    emailAgent.setGmailAccess(accessToken);
+    
+    const result = await emailAgent.checkEmails();
+    
+    res.json({
+      success: true,
+      emails: result.recentEmails || [],
+      count: (result.recentEmails || []).length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Gmail get emails error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to load emails',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.post('/api/gmail/ai-suggestions', async (req, res) => {
   try {
     const { accessToken, emails } = req.body;
@@ -834,6 +870,7 @@ app.use('*', (req, res) => {
       'GET /email-dashboard',
       'GET /email-superhuman',
       'POST /api/gmail/bulk-action',
+      'GET /api/gmail/emails',
       'POST /api/gmail/ai-suggestions',
       'POST /api/gmail/ai-reply',
       'POST /api/gmail/analytics',
