@@ -630,36 +630,8 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Open the auth URL in a new window
-                        const authWindow = window.open(
-                            data.authUrl,
-                            'gmail-auth',
-                            'width=600,height=700,scrollbars=yes,resizable=yes'
-                        );
-                        
-                        document.getElementById('gmailStatus').innerHTML = '<span class="text-blue-600">Opening Gmail authentication...</span>';
-                        
-                        // Show instructions for desktop app flow
-                        const instructions = `
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                                <h4 class="font-semibold text-blue-800 mb-2">📋 Gmail Authorization Instructions:</h4>
-                                <ol class="text-sm text-blue-700 space-y-1">
-                                    <li>1. Complete the authorization in the popup window</li>
-                                    <li>2. Copy the authorization code from the success page</li>
-                                    <li>3. Paste the code below and click "Complete Authorization"</li>
-                                </ol>
-                                <div class="mt-3">
-                                    <input type="text" id="authCode" placeholder="Paste authorization code here" 
-                                           class="w-full p-2 border rounded text-sm">
-                                    <button onclick="completeGmailAuth()" 
-                                            class="mt-2 bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
-                                        Complete Authorization
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        
-                        document.getElementById('gmailStatus').insertAdjacentHTML('afterend', instructions);
+                        // For web app flow, redirect the current window
+                        window.location.href = data.authUrl;
                     } else {
                         updateGmailStatus(false, 'Failed to start Gmail authentication: ' + data.error);
                     }
@@ -669,41 +641,58 @@
                 });
         }
         
-        function completeGmailAuth() {
-            const authCode = document.getElementById('authCode').value.trim();
+        // Check for OAuth callback parameters on page load
+        function checkGmailAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gmailAuth = urlParams.get('gmail_auth');
             
-            if (!authCode) {
-                alert('Please paste the authorization code');
-                return;
-            }
-            
-            // Send the authorization code to the server
-            fetch(`${API_BASE}/api/auth/gmail/callback`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ code: authCode })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    gmailAccessToken = data.tokens.access_token;
+            if (gmailAuth === 'success') {
+                const accessToken = urlParams.get('access_token');
+                const refreshToken = urlParams.get('refresh_token');
+                
+                if (accessToken) {
+                    gmailAccessToken = accessToken;
                     updateGmailStatus(true, 'Gmail connected successfully!');
                     
-                    // Remove the instructions
-                    const instructions = document.querySelector('.bg-blue-50');
-                    if (instructions) instructions.remove();
+                    // Clean up URL parameters
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
                     
-                    // Clear the auth code input
-                    document.getElementById('authCode').value = '';
-                } else {
-                    updateGmailStatus(false, 'Gmail authentication failed: ' + data.error);
+                    // Show success message
+                    showNotification('✅ Gmail connected successfully!', 'success');
                 }
-            })
-            .catch(error => {
-                updateGmailStatus(false, 'Error completing Gmail authentication: ' + error.message);
-            });
+            } else if (gmailAuth === 'error') {
+                const error = urlParams.get('error');
+                updateGmailStatus(false, 'Gmail authentication failed: ' + (error || 'Unknown error'));
+                
+                // Clean up URL parameters
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+                
+                // Show error message
+                showNotification('❌ Gmail authentication failed', 'error');
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.textContent = message;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
         }
         
         function updateGmailStatus(connected, message) {
@@ -1035,6 +1024,7 @@
         window.addEventListener('load', function() {
             initVoice();
             checkStatus();
+            checkGmailAuthCallback(); // Check for Gmail OAuth callback
             
             // Set up voice toggle button
             document.getElementById('voiceToggle').addEventListener('click', toggleVoiceMode);
