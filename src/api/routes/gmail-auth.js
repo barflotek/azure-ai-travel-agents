@@ -6,15 +6,26 @@ const router = express.Router();
 console.log('🔧 Gmail OAuth Configuration:');
 console.log('  - Client ID:', process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing');
 console.log('  - Client Secret:', process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing');
-console.log('  - OAuth Type: Desktop Application');
+console.log('  - OAuth Type: Web Application');
+
+// Determine redirect URI based on environment
+const getRedirectUri = () => {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/auth/gmail/callback`;
+  }
+  return 'http://localhost:3000/api/auth/gmail/callback';
+};
+
+const redirectUri = getRedirectUri();
+console.log('  - Redirect URI:', redirectUri);
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GMAIL_CLIENT_ID,
   process.env.GMAIL_CLIENT_SECRET,
-  'urn:ietf:wg:oauth:2.0:oob' // Special URI for desktop apps
+  redirectUri
 );
 
-// Start Gmail OAuth flow for desktop app
+// Start Gmail OAuth flow for web app
 router.get('/auth/gmail', (req, res) => {
   if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
     return res.status(500).json({
@@ -35,7 +46,7 @@ router.get('/auth/gmail', (req, res) => {
     prompt: 'consent' // Force consent to get refresh token
   });
 
-  console.log('🔐 Starting Gmail OAuth flow for desktop app...');
+  console.log('🔐 Starting Gmail OAuth flow for web app...');
   console.log('  - Auth URL:', url);
   
   // Return the auth URL for the frontend to open
@@ -46,9 +57,9 @@ router.get('/auth/gmail', (req, res) => {
   });
 });
 
-// Handle authorization code from desktop app flow
-router.post('/auth/gmail/callback', async (req, res) => {
-  const { code } = req.body;
+// Handle authorization callback from Google OAuth
+router.get('/auth/gmail/callback', async (req, res) => {
+  const { code } = req.query;
   
   if (!code) {
     return res.status(400).json({
@@ -63,20 +74,21 @@ router.post('/auth/gmail/callback', async (req, res) => {
     
     console.log('✅ Gmail OAuth completed successfully');
     
-    res.json({
-      success: true,
-      tokens,
-      message: 'Gmail connected successfully!',
-      scopes: tokens.scope?.split(' ') || []
-    });
+    // Redirect to frontend with success message
+    const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : 'http://localhost:4200';
+    
+    res.redirect(`${frontendUrl}?gmail_auth=success&access_token=${tokens.access_token}&refresh_token=${tokens.refresh_token || ''}`);
     
   } catch (error) {
     console.error('❌ Gmail OAuth error:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Failed to authenticate with Gmail',
-      details: error.message
-    });
+    
+    const frontendUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : 'http://localhost:4200';
+    
+    res.redirect(`${frontendUrl}?gmail_auth=error&error=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -162,7 +174,7 @@ router.get('/auth/gmail/debug', (req, res) => {
   const config = {
     clientId: process.env.GMAIL_CLIENT_ID ? '✅ Set' : '❌ Missing',
     clientSecret: process.env.GMAIL_CLIENT_SECRET ? '✅ Set' : '❌ Missing',
-    redirectUri: 'urn:ietf:wg:oauth:2.0:oob',
+    redirectUri: redirectUri,
     environment: process.env.NODE_ENV || 'development',
     railwayDomain: process.env.RAILWAY_PUBLIC_DOMAIN || 'Not set',
     gmailRedirectUri: process.env.GMAIL_REDIRECT_URI || 'Not set'
