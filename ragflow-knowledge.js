@@ -1,33 +1,42 @@
-// Use built-in fetch if available (Node.js 18+), otherwise use dynamic import
+// Use built-in fetch if available (Node.js 18+), otherwise use node-fetch v2
 let fetch;
 
-if (typeof globalThis.fetch === 'function') {
-  fetch = globalThis.fetch;
-} else {
-  // Fallback for older Node.js versions
-  try {
-    const nodeFetch = require('node-fetch');
-    fetch = nodeFetch.default || nodeFetch;
-  } catch (error) {
-    console.error('Fetch not available. Please install node-fetch or use Node.js 18+');
-    // Create a mock fetch for fallback
-    fetch = async () => {
-      throw new Error('Fetch not available');
-    };
+try {
+  // Try to use built-in fetch first (Node.js 18+)
+  if (typeof globalThis.fetch === 'function') {
+    fetch = globalThis.fetch;
+    console.log('✅ Using built-in fetch');
+  } else {
+    // Use node-fetch v2 (CommonJS compatible)
+    fetch = require('node-fetch');
+    console.log('✅ Using node-fetch v2');
   }
+} catch (error) {
+  console.error('❌ Fetch not available:', error.message);
+  // Create a mock fetch that returns an error
+  fetch = async (url, options) => {
+    console.log(`Mock fetch called for: ${url}`);
+    return {
+      ok: false,
+      status: 500,
+      statusText: 'Fetch not available',
+      json: async () => ({ error: 'Fetch not available' })
+    };
+  };
 }
 
 class KnowledgeService {
   constructor(baseUrl = 'http://localhost:9380') {
     this.baseUrl = baseUrl;
-    this.chatId = 'business-knowledge-agent'; // We'll create this chat assistant
-    this.apiKey = process.env.RAGFLOW_API_KEY || 'ragflow-ZiZDIzM2RjNTQ2NzExZjA5MWZjNDIwMT';
+    this.chatId = null; // Will be set dynamically
+    this.apiKey = process.env.RAGFLOW_API_KEY || 'ragflow-NjMmE2YzhlNTQ2ZDExZjBiNzNhZWE3MT';
     this.ragflowEnabled = false; // Will be set to true if RAGFlow is accessible
   }
 
   async initializeChatAssistant() {
     try {
       console.log('🤖 RAGFlow: Testing connection...');
+      console.log('🔑 Using API key:', this.apiKey);
       
       // Test if RAGFlow is accessible
       const testResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
@@ -41,20 +50,56 @@ class KnowledgeService {
       if (testResponse.ok) {
         console.log('✅ RAGFlow: Connection successful');
         this.ragflowEnabled = true;
-        return true;
-      }
+        
+        // Create a new chat assistant with proper configuration
+        console.log('🤖 RAGFlow: Creating chat assistant...');
+        const uniqueName = `Business Knowledge Agent ${Date.now()}`;
+        const createResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            name: uniqueName,
+            description: 'AI-powered business knowledge advisor',
+            dataset_ids: [],
+            llm: {
+              model_name: 'qwen-plus@Tongyi-Qianwen',
+              temperature: 0.1,
+              top_p: 0.3,
+              presence_penalty: 0.4,
+              frequency_penalty: 0.7
+            },
+            prompt: {
+              similarity_threshold: 0.2,
+              keywords_similarity_weight: 0.7,
+              top_n: 6,
+              variables: [{ key: 'knowledge', optional: true }],
+              empty_response: "I don't have enough knowledge to answer that question. Please upload relevant documents first.",
+              opener: "Hello! I'm your business knowledge advisor. I can help you with information from your uploaded documents.",
+              show_quote: true,
+              prompt: "You are an intelligent business advisor. Please analyze the knowledge base content to answer questions accurately and comprehensively. When the knowledge base content is irrelevant to the question, clearly state that the answer is not found in the knowledge base. Always provide detailed, actionable insights based on the available information."
+            }
+          })
+        });
 
-      // Try without authentication
-      const noAuthResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (noAuthResponse.ok) {
-        console.log('✅ RAGFlow: Connection successful (no auth)');
-        this.ragflowEnabled = true;
-        this.apiKey = ''; // No API key needed
-        return true;
+        if (createResponse.ok) {
+          const result = await createResponse.json();
+          if (result.code === 0 && result.data && result.data.id) {
+            this.chatId = result.data.id;
+            console.log(`✅ RAGFlow: Created chat assistant with ID: ${this.chatId}`);
+            return true;
+          } else {
+            console.log('⚠️ RAGFlow: Could not create chat assistant:', result.message);
+            this.ragflowEnabled = false;
+            return false;
+          }
+        } else {
+          console.log('⚠️ RAGFlow: Could not create chat assistant, status:', createResponse.status);
+          this.ragflowEnabled = false;
+          return false;
+        }
       }
 
       console.log('⚠️ RAGFlow: Connection failed, using fallback mode');
@@ -74,7 +119,7 @@ class KnowledgeService {
         await this.initializeChatAssistant();
       }
 
-      if (!this.ragflowEnabled) {
+      if (!this.ragflowEnabled || !this.chatId) {
         // Fallback to basic response
         return {
           success: true,
@@ -102,18 +147,61 @@ class KnowledgeService {
         headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
 
-      const response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}/completions`, {
+      let response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}/completions`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) {
-        throw new Error(`RAGFlow API error: ${response.status} ${response.statusText}`);
+      let result = await response.json();
+
+      // If error: You don't own the chat, create a new chat assistant and retry
+      if (result.message && (result.message.includes("don't own the chat") || result.message.includes("Type of chat model is not set"))) {
+        console.log('⚠️ RAGFlow: Creating a new chat assistant for this user...');
+        const uniqueName = `Business Knowledge Agent ${Date.now()}`;
+        const createResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({
+            name: uniqueName,
+            description: 'AI-powered business knowledge advisor',
+            dataset_ids: [],
+            llm: {
+              model_name: 'qwen-plus@Tongyi-Qianwen',
+              temperature: 0.1,
+              top_p: 0.3,
+              presence_penalty: 0.4,
+              frequency_penalty: 0.7
+            },
+            prompt: {
+              similarity_threshold: 0.2,
+              keywords_similarity_weight: 0.7,
+              top_n: 6,
+              variables: [{ key: 'knowledge', optional: true }],
+              empty_response: "I don't have enough knowledge to answer that question. Please upload relevant documents first.",
+              opener: "Hello! I'm your business knowledge advisor. I can help you with information from your uploaded documents.",
+              show_quote: true,
+              prompt: "You are an intelligent business advisor. Please analyze the knowledge base content to answer questions accurately and comprehensively. When the knowledge base content is irrelevant to the question, clearly state that the answer is not found in the knowledge base. Always provide detailed, actionable insights based on the available information."
+            }
+          })
+        });
+        const createResult = await createResponse.json();
+        if (createResult.code === 0 && createResult.data && createResult.data.id) {
+          this.chatId = createResult.data.id;
+          console.log(`✅ RAGFlow: Created new chat assistant with ID: ${this.chatId}`);
+          // Retry the question with the new chatId
+          response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}/completions`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(requestBody)
+          });
+          result = await response.json();
+        } else {
+          console.log('❌ RAGFlow: Failed to create a new chat assistant for this user.');
+          throw new Error('Failed to create a new chat assistant for this user.');
+        }
       }
 
-      const result = await response.json();
-      
       if (result.code === 0 && result.data) {
         console.log(`✅ RAGFlow: Received response with ${result.data.answer?.length || 0} characters`);
         
@@ -148,7 +236,7 @@ class KnowledgeService {
         await this.initializeChatAssistant();
       }
 
-      if (this.ragflowEnabled) {
+      if (this.ragflowEnabled && this.chatId) {
         const headers = { 'Content-Type': 'application/json' };
         if (this.apiKey) {
           headers['Authorization'] = `Bearer ${this.apiKey}`;
