@@ -27,10 +27,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    if (file.mimetype === 'application/pdf' || file.mimetype === 'text/plain') {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF files allowed'), false);
+      cb(new Error('Only PDF and text files allowed'), false);
     }
   }
 });
@@ -133,73 +133,54 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Knowledge base endpoints - NOW USING RAGFLOW!
+// Knowledge base endpoints - NOW USING NEW KNOWLEDGE SERVICE!
 app.post('/api/knowledge/upload', upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'No PDF file uploaded'
+        error: 'No file uploaded'
       });
     }
 
-    console.log(`📄 Processing PDF: ${req.file.originalname}`);
+    console.log(`📄 Processing file: ${req.file.originalname}`);
     
-    // For now, keep the old system for upload tracking
-    // In the future, we can integrate with RAGFlow's upload API
-    const pdfData = await pdfParse(req.file.buffer);
-    const text = pdfData.text;
+    // Use the new knowledge service for processing
+    const result = await knowledgeService.uploadDocument(req.file.buffer, req.file.originalname);
     
-    if (!text || text.trim().length < 100) {
-      return res.status(400).json({
+    if (result.success) {
+      // Also update the old tracking system for compatibility
+      const document = {
+        id: `doc_${Date.now()}`,
+        filename: req.file.originalname,
+        size: req.file.size,
+        chunkCount: result.chunksAdded,
+        uploadedAt: new Date().toISOString(),
+        summary: `Document with ${result.chunksAdded} knowledge chunks`
+      };
+      
+      documents.push(document);
+      
+      res.json({
+        success: true,
+        message: result.message,
+        document,
+        chunkCount: result.chunksAdded,
+        totalChunks: result.totalChunks,
+        note: result.note
+      });
+    } else {
+      res.status(400).json({
         success: false,
-        error: 'PDF appears to be empty or unreadable'
+        error: result.error
       });
     }
-    
-    // Create chunks
-    const textChunks = chunkText(text);
-    const documentId = `doc_${Date.now()}`;
-    
-    // Store chunks in knowledge base
-    const chunks = textChunks.map((chunk, index) => ({
-      id: `${documentId}_chunk_${index}`,
-      content: chunk,
-      filename: req.file.originalname,
-      documentId,
-      chunkIndex: index,
-      uploadedAt: new Date().toISOString()
-    }));
-    
-    knowledgeBase.push(...chunks);
-    
-    // Store document metadata
-    const document = {
-      id: documentId,
-      filename: req.file.originalname,
-      size: req.file.size,
-      chunkCount: chunks.length,
-      uploadedAt: new Date().toISOString(),
-      summary: `Document with ${chunks.length} knowledge chunks`
-    };
-    
-    documents.push(document);
-    
-    console.log(`✅ Successfully processed ${req.file.originalname}: ${chunks.length} chunks`);
-    
-    res.json({
-      success: true,
-      message: `Successfully processed ${req.file.originalname}`,
-      document,
-      chunkCount: chunks.length,
-      totalChunks: knowledgeBase.length
-    });
     
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({
       success: false,
-      error: `Failed to process PDF: ${error.message}`
+      error: `Failed to process file: ${error.message}`
     });
   }
 });

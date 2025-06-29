@@ -26,308 +26,253 @@ try {
 }
 
 class KnowledgeService {
-  constructor(baseUrl = 'http://localhost:9380') {
-    this.baseUrl = baseUrl;
-    this.chatId = null; // Will be set dynamically
-    this.apiKey = process.env.RAGFLOW_API_KEY || 'ragflow-NjMmE2YzhlNTQ2ZDExZjBiNzNhZWE3MT';
-    this.ragflowEnabled = false; // Will be set to true if RAGFlow is accessible
-  }
-
-  async initializeChatAssistant() {
-    try {
-      console.log('🤖 RAGFlow: Testing connection...');
-      console.log('🔑 Using API key:', this.apiKey);
-      
-      // Test if RAGFlow is accessible
-      const testResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        }
-      });
-
-      if (testResponse.ok) {
-        console.log('✅ RAGFlow: Connection successful');
-        this.ragflowEnabled = true;
-        
-        // Get existing chat assistants to see if any have proper model configuration
-        const chatsResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
-          method: 'GET',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          }
-        });
-        
-        if (chatsResponse.ok) {
-          const chatsResult = await chatsResponse.json();
-          if (chatsResult.code === 0 && chatsResult.data && chatsResult.data.length > 0) {
-            // Find a chat assistant with a proper model name
-            const workingChat = chatsResult.data.find(chat => 
-              chat.llm && chat.llm.model_name && chat.llm.model_name.trim() !== ''
-            );
-            
-            if (workingChat) {
-              this.chatId = workingChat.id;
-              console.log(`✅ RAGFlow: Using existing chat assistant with ID: ${this.chatId}`);
-              return true;
-            }
-          }
-        }
-        
-        // Try to create a new chat assistant with minimal configuration
-        console.log('🤖 RAGFlow: Creating chat assistant...');
-        const uniqueName = `Business Knowledge Agent ${Date.now()}`;
-        
-        // Try different model names that might be available
-        const modelNames = [
-          'qwen-plus@Tongyi-Qianwen',
-          'gpt-3.5-turbo',
-          'gpt-4',
-          'claude-3-sonnet',
-          'llama2',
-          'mistral'
-        ];
-        
-        let createSuccess = false;
-        
-        for (const modelName of modelNames) {
-          try {
-            console.log(`🤖 RAGFlow: Trying model: ${modelName}`);
-            const createResponse = await fetch(`${this.baseUrl}/api/v1/chats`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiKey}`
-              },
-              body: JSON.stringify({
-                name: uniqueName,
-                description: 'AI-powered business knowledge advisor',
-                dataset_ids: [],
-                llm: {
-                  model_name: modelName,
-                  temperature: 0.1,
-                  top_p: 0.3,
-                  presence_penalty: 0.4,
-                  frequency_penalty: 0.7,
-                  max_tokens: 2048
-                },
-                prompt: {
-                  similarity_threshold: 0.2,
-                  keywords_similarity_weight: 0.7,
-                  top_n: 6,
-                  variables: [{ key: 'knowledge', optional: true }],
-                  empty_response: "I don't have enough knowledge to answer that question. Please upload relevant documents first.",
-                  opener: "Hello! I'm your business knowledge advisor. I can help you with information from your uploaded documents.",
-                  show_quote: true,
-                  prompt: "You are an intelligent business advisor. Please analyze the knowledge base content to answer questions accurately and comprehensively. When the knowledge base content is irrelevant to the question, clearly state that the answer is not found in the knowledge base. Always provide detailed, actionable insights based on the available information."
-                }
-              })
-            });
-
-            if (createResponse.ok) {
-              const result = await createResponse.json();
-              if (result.code === 0 && result.data && result.data.id) {
-                this.chatId = result.data.id;
-                console.log(`✅ RAGFlow: Created chat assistant with ID: ${this.chatId} using model: ${modelName}`);
-                createSuccess = true;
-                break;
-              } else {
-                console.log(`⚠️ RAGFlow: Could not create chat assistant with model ${modelName}:`, result.message);
-              }
-            } else {
-              console.log(`⚠️ RAGFlow: Could not create chat assistant with model ${modelName}, status:`, createResponse.status);
-            }
-          } catch (error) {
-            console.log(`⚠️ RAGFlow: Error trying model ${modelName}:`, error.message);
-          }
-        }
-        
-        if (!createSuccess) {
-          console.log('⚠️ RAGFlow: Could not create chat assistant with any available model');
-          this.ragflowEnabled = false;
-          return false;
-        }
-        
-        return true;
-      }
-
-      console.log('⚠️ RAGFlow: Connection failed, using fallback mode');
-      this.ragflowEnabled = false;
-      return false;
-    } catch (error) {
-      console.error(`❌ RAGFlow connection error: ${error.message}`);
-      this.ragflowEnabled = false;
-      return false;
+  constructor() {
+    this.openaiApiKey = process.env.OPENAI_API_KEY;
+    this.openaiUrl = 'https://api.openai.com/v1/chat/completions';
+    this.knowledgeBase = []; // Simple in-memory knowledge base
+    this.openaiEnabled = false;
+    
+    // Check if OpenAI is configured
+    if (this.openaiApiKey) {
+      this.openaiEnabled = true;
+      console.log('✅ OpenAI API key found');
+    } else {
+      console.log('⚠️ OpenAI API key not found, using fallback mode');
     }
   }
 
   async askQuestion(question, sessionId = null) {
     try {
-      // Initialize RAGFlow connection if not done yet
-      if (this.ragflowEnabled === false) {
-        await this.initializeChatAssistant();
-      }
-
-      if (!this.ragflowEnabled || !this.chatId) {
-        // Fallback to basic response
-        return {
-          success: true,
-          answer: `I received your question: "${question}". RAGFlow integration is being set up. For now, I'm using the fallback knowledge system.`,
-          sources: [],
-          citations: [],
-          confidence: 'fallback',
-          sessionId: sessionId || 'fallback-session'
-        };
-      }
-
-      console.log(`🤖 RAGFlow: Asking question: "${question}"`);
+      console.log(`🤖 Processing question: "${question}"`);
       
-      const requestBody = {
-        question: question,
-        stream: false
-      };
-
-      if (sessionId) {
-        requestBody.session_id = sessionId;
-      }
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.apiKey) {
-        headers['Authorization'] = `Bearer ${this.apiKey}`;
-      }
-
-      let response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}/completions`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestBody)
-      });
-
-      let result = await response.json();
-
-      // If error: You don't own the chat or model not set, create a new chat assistant and retry
-      if (result.message && (result.message.includes("don't own the chat") || result.message.includes("Type of chat model is not set"))) {
-        console.log('⚠️ RAGFlow: Creating a new chat assistant for this user...');
-        // Re-initialize to create a new chat assistant
-        this.ragflowEnabled = false;
-        this.chatId = null;
-        await this.initializeChatAssistant();
-        
-        if (this.ragflowEnabled && this.chatId) {
-          // Retry the question with the new chatId
-          response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}/completions`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(requestBody)
-          });
-          result = await response.json();
-        } else {
-          throw new Error('Failed to create a new chat assistant for this user.');
-        }
-      }
-
-      if (result.code === 0 && result.data) {
-        console.log(`✅ RAGFlow: Received response with ${result.data.answer?.length || 0} characters`);
-        
-        return {
-          success: true,
-          answer: result.data.answer || 'No answer found.',
-          sources: result.data.reference?.chunks || [],
-          citations: result.data.reference?.doc_aggs || [],
-          confidence: result.data.reference?.total > 0 ? 'high' : 'low',
-          sessionId: result.data.session_id,
-          raw: result.data
-        };
+      // Search knowledge base for relevant context
+      const relevantChunks = this.searchKnowledgeBase(question, 3);
+      const context = relevantChunks.length > 0 ? 
+        relevantChunks.map(chunk => chunk.content).join('\n\n') : '';
+      
+      if (this.openaiEnabled) {
+        return await this.askWithOpenAI(question, context);
       } else {
-        throw new Error(`RAGFlow error: ${result.message || 'Unknown error'}`);
+        return this.generateFallbackResponse(question, context);
       }
     } catch (error) {
-      console.error(`❌ RAGFlow error: ${error.message}`);
+      console.error(`❌ Knowledge service error: ${error.message}`);
+      return this.generateFallbackResponse(question, '');
+    }
+  }
+
+  async askWithOpenAI(question, context = '') {
+    try {
+      console.log(`🤖 OpenAI: Asking question with ${context.length} chars of context`);
+      
+      const messages = [
+        {
+          role: "system",
+          content: "You are a helpful business knowledge assistant. Answer questions based on the provided context. If the context doesn't contain relevant information, say so clearly. Be concise but helpful."
+        }
+      ];
+
+      if (context) {
+        messages.push({
+          role: "user",
+          content: `Context: ${context}\n\nQuestion: ${question}`
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: question
+        });
+      }
+
+      const response = await fetch(this.openaiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.openaiApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: messages,
+          max_tokens: 1000,
+          temperature: 0.1
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const answer = result.choices[0]?.message?.content || 'No response generated';
+        
+        console.log(`✅ OpenAI: Received response with ${answer.length} characters`);
+        
+        return {
+          success: true,
+          answer: answer,
+          sources: context ? [{
+            filename: 'knowledge_base',
+            excerpt: context.substring(0, 200) + '...'
+          }] : [],
+          citations: [],
+          confidence: context ? 'high' : 'medium',
+          sessionId: `openai-${Date.now()}`,
+          model: 'gpt-3.5-turbo'
+        };
+      } else {
+        const errorData = await response.json();
+        throw new Error(`OpenAI error: ${errorData.error?.message || response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`❌ OpenAI error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  generateFallbackResponse(question, context = '') {
+    if (context) {
       return {
-        success: true, // Still return success for fallback
-        answer: `I received your question: "${question}". RAGFlow is currently unavailable, but I'm using the fallback knowledge system.`,
+        success: true,
+        answer: `I found some relevant information in your knowledge base:\n\n${context.substring(0, 300)}...\n\n[Note: This is a basic response. Configure OpenAI API key for better AI responses.]`,
+        sources: [{
+          filename: 'knowledge_base',
+          excerpt: context.substring(0, 200) + '...'
+        }],
+        citations: [],
+        confidence: 'low',
+        sessionId: `fallback-${Date.now()}`
+      };
+    } else {
+      return {
+        success: true,
+        answer: `I received your question: "${question}". I don't have any relevant information in my knowledge base yet. Please upload some documents first, and configure your OpenAI API key for better AI responses.`,
         sources: [],
         citations: [],
-        confidence: 'fallback',
-        sessionId: sessionId || 'fallback-session'
+        confidence: 'none',
+        sessionId: `fallback-${Date.now()}`
       };
     }
   }
 
-  async getKnowledgeBaseStatus() {
-    try {
-      if (!this.ragflowEnabled) {
-        await this.initializeChatAssistant();
-      }
-
-      if (this.ragflowEnabled && this.chatId) {
-        const headers = { 'Content-Type': 'application/json' };
-        if (this.apiKey) {
-          headers['Authorization'] = `Bearer ${this.apiKey}`;
-        }
-
-        const response = await fetch(`${this.baseUrl}/api/v1/chats/${this.chatId}`, {
-          method: 'GET',
-          headers: headers
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.code === 0) {
-            return {
-              success: true,
-              status: 'operational',
-              chatAssistant: result.data,
-              totalDatasets: result.data.dataset_ids?.length || 0,
-              ragflowEnabled: true
-            };
-          }
-        }
-      }
-
-      return { 
-        success: true, 
-        status: 'fallback',
-        error: 'RAGFlow not accessible, using fallback system',
-        ragflowEnabled: false
-      };
-    } catch (error) {
-      return { 
-        success: true, 
-        status: 'fallback',
-        error: error.message,
-        ragflowEnabled: false
-      };
+  searchKnowledgeBase(query, limit = 5) {
+    if (this.knowledgeBase.length === 0) {
+      return [];
     }
+
+    const queryWords = query.toLowerCase().split(/\W+/);
+    
+    const scored = this.knowledgeBase.map(chunk => {
+      const chunkWords = chunk.content.toLowerCase().split(/\W+/);
+      let score = 0;
+      
+      queryWords.forEach(word => {
+        const matches = chunkWords.filter(w => w.includes(word) || word.includes(w));
+        score += matches.length;
+      });
+      
+      return { chunk, score };
+    });
+    
+    return scored
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(item => item.chunk);
+  }
+
+  addToKnowledgeBase(content, filename = 'uploaded-document') {
+    const chunk = {
+      id: `chunk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      content: content,
+      filename: filename,
+      uploadedAt: new Date().toISOString()
+    };
+    
+    this.knowledgeBase.push(chunk);
+    console.log(`✅ Added chunk to knowledge base: ${chunk.id}`);
+    return chunk;
+  }
+
+  async getKnowledgeBaseStatus() {
+    return {
+      success: true,
+      status: this.openaiEnabled ? 'operational' : 'fallback',
+      error: this.openaiEnabled ? 'Using OpenAI for AI responses' : 'OpenAI not configured, using fallback system',
+      openaiEnabled: this.openaiEnabled,
+      localKnowledgeBase: {
+        totalChunks: this.knowledgeBase.length,
+        documents: this.knowledgeBase.map(chunk => chunk.filename).filter((v, i, a) => a.indexOf(v) === i)
+      }
+    };
   }
 
   async uploadDocument(fileBuffer, fileName) {
     try {
-      if (!this.ragflowEnabled) {
-        await this.initializeChatAssistant();
+      console.log(`📄 Processing document: ${fileName}`);
+      
+      // Convert buffer to text (assuming it's a text file or PDF)
+      let text = '';
+      try {
+        // Try to parse as PDF first
+        const pdfParse = require('pdf-parse');
+        const pdfData = await pdfParse(fileBuffer);
+        text = pdfData.text;
+      } catch (error) {
+        // If not PDF, try as text
+        text = fileBuffer.toString('utf8');
       }
-
-      if (this.ragflowEnabled) {
-        console.log(`📄 RAGFlow: Document upload not yet implemented for ${fileName}`);
+      
+      if (!text || text.trim().length < 50) {
         return {
-          success: true,
-          message: `Document ${fileName} will be processed by the fallback system`,
-          note: 'RAGFlow document upload integration coming soon'
+          success: false,
+          error: 'Document appears to be empty or unreadable'
         };
       }
-
+      
+      // Split text into chunks
+      const chunks = this.chunkText(text);
+      
+      // Add chunks to knowledge base
+      chunks.forEach((chunk, index) => {
+        this.addToKnowledgeBase(chunk, `${fileName}_chunk_${index}`);
+      });
+      
+      console.log(`✅ Successfully processed ${fileName}: ${chunks.length} chunks added to knowledge base`);
+      
       return {
         success: true,
-        message: `Document ${fileName} processed by fallback system`,
-        note: 'RAGFlow not available, using local processing'
+        message: `Successfully processed ${fileName}`,
+        chunksAdded: chunks.length,
+        totalChunks: this.knowledgeBase.length,
+        note: this.openaiEnabled ? 'Document added to knowledge base for OpenAI queries' : 'Document added to knowledge base'
       };
     } catch (error) {
+      console.error('Upload error:', error);
       return {
         success: false,
         error: error.message
       };
     }
+  }
+
+  chunkText(text, chunkSize = 1000, overlap = 200) {
+    const chunks = [];
+    let start = 0;
+    
+    while (start < text.length) {
+      const end = Math.min(start + chunkSize, text.length);
+      const chunk = text.slice(start, end);
+      
+      // Try to break at sentence boundaries
+      const lastSentence = chunk.lastIndexOf('.');
+      const finalChunk = lastSentence > start + chunkSize * 0.5 ? 
+        chunk.slice(0, lastSentence + 1) : chunk;
+      
+      if (finalChunk.trim().length > 50) {
+        chunks.push(finalChunk.trim());
+      }
+      
+      start += chunkSize - overlap;
+    }
+    
+    return chunks;
   }
 }
 
